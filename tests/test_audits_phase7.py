@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from audits.models import AgentRun, Audit, AuditReport, EvidenceSnapshot, StageEvent
+from audits.models import AgentRun, Audit, AuditReport, CrawlURL, EvidenceSnapshot, StageEvent
 from collector.evidence import PageEvidence
 from core.errors import FetchError
 from pipeline.final_audit import deterministic_fallback
@@ -78,6 +78,32 @@ class AuditApiTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"error": "Audit not found."})
+
+    def test_crawl_urls_endpoint_returns_inventory_and_supports_status_filter(self):
+        audit = Audit.objects.create(
+            url="https://example.com/",
+            normalized_url="https://example.com/",
+        )
+        CrawlURL.objects.create(
+            audit=audit,
+            url="https://example.com/",
+            status=CrawlURL.Status.FETCHED,
+            discovery_source=CrawlURL.DiscoverySource.SUBMITTED,
+        )
+        CrawlURL.objects.create(
+            audit=audit,
+            url="https://example.com/missing",
+            status=CrawlURL.Status.FAILED,
+            response_status=404,
+            error="HTTP response status 404",
+        )
+
+        response = self.client.get(f"/api/audits/{audit.id}/urls/?status=failed")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.json()[0]["url"], "https://example.com/missing")
+        self.assertEqual(response.json()[0]["response_status"], 404)
 
     def test_malformed_audit_id_returns_json_not_found(self):
         response = self.client.get("/api/audits/not-a-uuid/")

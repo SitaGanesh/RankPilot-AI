@@ -205,7 +205,9 @@ Planned technologies are architectural choices to validate against the existing 
 
 ## 11. Current Status
 
-The project currently has a foundational single-page SEO audit workflow with On-Page SEO and Technical SEO analysis. This is the starting point for the larger platform, not the completed product.
+The project currently has a foundational single-page SEO audit workflow with On-Page SEO and Technical SEO analysis. The first bounded discovery step is also implemented: each audit persists a breadth-first, same-host crawl frontier, sitemap/page discoveries, and internal-link edges while preserving the existing single-page evidence and API response. This is the starting point for the larger platform, not the completed product.
+
+Discovery removes URL fragments, normalizes trailing slashes, preserves query strings, rejects external hosts, revalidates secure redirects through the existing collector, and enforces configurable page, depth, sitemap, response, timeout, redirect, and per-host request limits. Pages are not analyzed as part of discovery; they remain available for a later worker-based analysis phase.
 
 The immediate development priority is full-domain URL discovery and persistent crawl state. Subsequent stages will introduce asynchronous processing, independent page reports, domain-wide analysis, search-performance integrations, and continuous monitoring.
 

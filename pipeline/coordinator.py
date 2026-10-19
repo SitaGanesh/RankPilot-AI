@@ -16,6 +16,7 @@ from pipeline.report_builder import build_report
 from pipeline.stages import EventEmitter, Stage, StageStatus
 
 from audits.models import AgentRun, Audit, AuditReport, EvidenceSnapshot, StageEvent
+from discovery.service import URLDiscoveryService
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class SEOCoordinator:
         self.audit.save(update_fields=["status"])
         self._emit(Stage.COORDINATOR, StageStatus.RUNNING, "Starting website collection")
         self._emit(Stage.COLLECTOR, StageStatus.RUNNING, "Fetching page")
+        URLDiscoveryService(self.audit).run()
         evidence = collect_evidence(self.audit.normalized_url)
         EvidenceSnapshot.objects.create(audit=self.audit, json=evidence.model_dump(mode="json"))
         if evidence.collection_errors:

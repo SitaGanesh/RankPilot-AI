@@ -76,3 +76,60 @@ class AuditReport(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
         indexes = [models.Index(fields=["normalized_url", "agent_id", "created_at"])]
+
+
+class CrawlURL(models.Model):
+    class ResourceType(models.TextChoices):
+        PAGE = "page", "HTML page"
+        MEDIA = "media", "Media resource"
+
+    class DiscoverySource(models.TextChoices):
+        SUBMITTED = "submitted", "Submitted"
+        INTERNAL_LINK = "internal_link", "Internal link"
+        SITEMAP = "sitemap", "Sitemap"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        FETCHING = "fetching", "Fetching"
+        FETCHED = "fetched", "Fetched"
+        FAILED = "failed", "Failed"
+        SKIPPED = "skipped", "Skipped"
+
+    audit = models.ForeignKey(Audit, on_delete=models.CASCADE, related_name="crawl_urls")
+    url = models.URLField(max_length=2048)
+    depth = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    resource_type = models.CharField(
+        max_length=10, choices=ResourceType.choices, default=ResourceType.PAGE
+    )
+    discovery_source = models.CharField(
+        max_length=20, choices=DiscoverySource.choices, default=DiscoverySource.SUBMITTED
+    )
+    discovery_source_url = models.URLField(max_length=2048, blank=True)
+    discovered_from = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="discovered_urls"
+    )
+    final_url = models.URLField(max_length=2048, blank=True)
+    response_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["audit", "url"], name="unique_crawl_url_per_audit"),
+        ]
+        ordering = ["depth", "created_at", "id"]
+
+
+class CrawlLink(models.Model):
+    audit = models.ForeignKey(Audit, on_delete=models.CASCADE, related_name="crawl_links")
+    source = models.ForeignKey(CrawlURL, on_delete=models.CASCADE, related_name="outgoing_links")
+    destination = models.ForeignKey(CrawlURL, on_delete=models.CASCADE, related_name="incoming_links")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["audit", "source", "destination"], name="unique_crawl_link_per_audit"
+            ),
+        ]

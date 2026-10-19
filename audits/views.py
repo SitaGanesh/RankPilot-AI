@@ -16,7 +16,12 @@ from core.registry import list_agents
 from pipeline.coordinator import run_agent, run_collection
 
 from .models import Audit
-from .serializers import AuditCreateSerializer, AuditReportSerializer, AuditStatusSerializer
+from .serializers import (
+    AuditCreateSerializer,
+    AuditReportSerializer,
+    AuditStatusSerializer,
+    CrawlURLSerializer,
+)
 
 
 def home(request):
@@ -65,6 +70,18 @@ class AuditStatusView(APIView):
         if error is not None:
             return error
         return Response(AuditStatusSerializer(audit).data)
+
+
+class AuditCrawlURLView(APIView):
+    def get(self, request, audit_id):
+        audit, error = _audit_or_error(audit_id)
+        if error is not None:
+            return error
+        urls = audit.crawl_urls.all()
+        requested_status = request.query_params.get("status")
+        if requested_status:
+            urls = urls.filter(status=requested_status)
+        return Response(CrawlURLSerializer(urls, many=True).data)
 
 
 class AgentListView(APIView):

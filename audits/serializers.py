@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from .models import Audit, AuditReport, StageEvent
+from .models import Audit, AuditReport, CrawlURL, StageEvent
 
 
 class AuditCreateSerializer(serializers.Serializer):
@@ -27,3 +27,23 @@ class AuditReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditReport
         fields = ["agent_id", "report_json", "created_at"]
+
+
+class CrawlURLSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CrawlURL
+        fields = [
+            "id",
+            "url",
+            "status",
+            "resource_type",
+            "depth",
+            "response_status",
+            "discovery_source",
+            "discovery_source_url",
+            "discovered_from",
+            "final_url",
+            "error",
+            "created_at",
+            "updated_at",
+        ]

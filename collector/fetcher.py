@@ -2,11 +2,12 @@
 
 from dataclasses import dataclass
 from time import perf_counter
+from typing import Callable
 from urllib.parse import urljoin
 
 import requests
 
-from core.errors import FetchError, SecurityError
+from core.errors import FetchError, HTTPStatusError, NonHTMLResponseError, SecurityError
 from core.security import MAX_REDIRECTS, validate_url
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -47,7 +48,7 @@ def _read_bounded(response: requests.Response) -> bytes:
     return bytes(body)
 
 
-def fetch_page(url: str) -> FetchedPage:
+def fetch_page(url: str, request_hook: Callable[[], None] | None = None) -> FetchedPage:
     """Fetch HTML without forwarding cookies and revalidate every redirect."""
 
     normalized_url = validate_url(url)
@@ -58,6 +59,8 @@ def fetch_page(url: str) -> FetchedPage:
     session.cookies.clear()
     try:
         for _ in range(MAX_REDIRECTS + 1):
+            if request_hook is not None:
+                request_hook()
             response = session.get(
                 current_url,
                 headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"},
@@ -76,10 +79,21 @@ def fetch_page(url: str) -> FetchedPage:
             if not isinstance(response.status_code, int) or not 100 <= response.status_code <= 599:
                 raise FetchError("Response has an invalid HTTP status")
             if 300 <= response.status_code < 400:
-                raise FetchError("Response contains an unsupported redirect status")
+                raise HTTPStatusError(
+                    "Response contains an unsupported redirect status",
+                    response.status_code,
+                )
             content_type = response.headers.get("Content-Type", "").lower()
             if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
-                raise FetchError("Response Content-Type is not HTML")
+                try:
+                    raise NonHTMLResponseError(
+                        "Response Content-Type is not HTML",
+                        response.status_code,
+                        current_url,
+                        content_type.split(";", 1)[0].strip(),
+                    )
+                finally:
+                    response.close()
             try:
                 body = _read_bounded(response)
                 return FetchedPage(

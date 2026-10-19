@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from time import perf_counter
+from typing import Callable
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
@@ -53,7 +54,11 @@ def _read_bounded(response: requests.Response) -> bytes:
     return bytes(body)
 
 
-def fetch_resource(url: str, allowed_content_types: set[str]) -> ResourceObservation:
+def fetch_resource(
+    url: str,
+    allowed_content_types: set[str],
+    request_hook: Callable[[], None] | None = None,
+) -> ResourceObservation:
     """Fetch one resource with the same SSRF and redirect protections as pages."""
 
     normalized_url = validate_url(url)
@@ -63,6 +68,8 @@ def fetch_resource(url: str, allowed_content_types: set[str]) -> ResourceObserva
     session.cookies.clear()
     try:
         for _ in range(MAX_REDIRECTS + 1):
+            if request_hook is not None:
+                request_hook()
             response = session.get(
                 current_url,
                 headers={"User-Agent": USER_AGENT, "Accept": "*/*"},
@@ -130,12 +137,19 @@ def _sitemap_entries(body: bytes) -> list[str]:
         root = ElementTree.fromstring(body)
     except ElementTree.ParseError as exc:
         raise FetchError("Sitemap is not well-formed XML") from exc
-    namespace = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
-    return [
-        location.text.strip()
-        for location in root.findall(f".//{namespace}loc")
-        if location.text and location.text.strip()
-    ][:1000]
+    root_name = root.tag.rsplit("}", 1)[-1].lower()
+    entry_name = "sitemap" if root_name == "sitemapindex" else "url"
+    if root_name not in {"sitemapindex", "urlset"}:
+        raise FetchError("Sitemap has an unsupported root element")
+    locations = []
+    for entry in root:
+        if entry.tag.rsplit("}", 1)[-1].lower() != entry_name:
+            continue
+        for child in entry:
+            if child.tag.rsplit("}", 1)[-1].lower() == "loc" and child.text and child.text.strip():
+                locations.append(child.text.strip())
+                break
+    return locations[:1000]
 
 
 def collect_technical_resources(page_url: str) -> tuple[ResourceObservation, list[ResourceObservation]]:

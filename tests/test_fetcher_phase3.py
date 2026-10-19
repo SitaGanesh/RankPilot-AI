@@ -4,7 +4,7 @@ import pytest
 import requests
 
 from collector.fetcher import MAX_BODY_BYTES, TIMEOUT, USER_AGENT, fetch_page
-from core.errors import FetchError, SSRFError
+from core.errors import FetchError, NonHTMLResponseError, SSRFError
 
 
 @dataclass
@@ -121,6 +121,28 @@ def test_fetcher_rejects_missing_location_and_non_html(monkeypatch):
         monkeypatch.setattr("collector.fetcher.requests.Session", lambda: session)
         with pytest.raises(FetchError):
             fetch_page("https://example.com/")
+
+
+def test_fetcher_exposes_non_html_response_metadata(monkeypatch):
+    session = FakeSession([FakeResponse(200, {"Content-Type": "image/jpeg"}, b"jpeg")])
+    monkeypatch.setattr("collector.fetcher.validate_url", lambda url: url)
+    monkeypatch.setattr("collector.fetcher.requests.Session", lambda: session)
+
+    with pytest.raises(NonHTMLResponseError) as caught:
+        fetch_page("https://example.com/photo.jpg")
+
+    assert caught.value.status == 200
+    assert caught.value.final_url == "https://example.com/photo.jpg"
+    assert caught.value.content_type == "image/jpeg"
+
+
+@pytest.mark.parametrize("url", ["https://example.com/no-extension", "https://example.com/photo.jpg"])
+def test_fetcher_uses_content_type_not_url_suffix(monkeypatch, url):
+    session = FakeSession([FakeResponse(200, {"Content-Type": "text/html"}, b"<p>ok</p>")])
+    monkeypatch.setattr("collector.fetcher.validate_url", lambda value: value)
+    monkeypatch.setattr("collector.fetcher.requests.Session", lambda: session)
+
+    assert fetch_page(url).body == b"<p>ok</p>"
 
 
 def test_fetcher_converts_connection_failures_to_fetch_errors(monkeypatch):
