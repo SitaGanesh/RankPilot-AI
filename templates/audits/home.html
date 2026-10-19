@@ -1,0 +1,31 @@
+{% extends "audits/base.html" %}
+{% block title %}RankPilot AI| Start{% endblock %}
+{% block content %}
+<section class="home-shell">
+  <div class="container home-grid">
+    <div class="home-copy">
+      <p class="eyebrow">ON-PAGE SEO / RULE CHECKLIST</p>
+      <h1>See what your page is signaling.</h1>
+      <p class="lede">Run a grounded audit of the page structure, metadata, links, content signals, and indexability that search engines can actually observe.</p>
+      <div class="signal-row" aria-label="Audit coverage">
+        <span><strong>16</strong> deterministic checks</span>
+        <span><strong>100</strong> possible points</span>
+        <span><strong>0</strong> invented findings</span>
+      </div>
+    </div>
+    <div class="url-panel">
+      <p class="panel-kicker">START AN AUDIT</p>
+      <form id="audit-form" class="audit-form">
+        <label for="audit-url">Public page URL</label>
+        <div class="input-wrap">
+          
+          <input id="audit-url" name="url" type="text" inputmode="url" placeholder="https://example.com/page" required autocomplete="url">
+        </div>
+        <button class="btn btn-primary w-100" type="submit"><span>Evaluate page</span><span aria-hidden="true">&#8594;</span></button>
+        <p id="form-error" class="form-error" role="alert"></p>
+      </form>
+      <p class="privacy-note">Only public HTML is collected. Blocked or missing signals remain unknown and are not counted against the score.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

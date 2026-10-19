@@ -1,0 +1,39 @@
+{% extends "audits/base.html" %}
+{% block title %}RankPilot AI| Report{% endblock %}
+{% block content %}
+<div class="container audit-shell" data-audit-id="{{ audit_id }}">
+  <header class="audit-header">
+    <div>
+      <p class="eyebrow">AUDIT <span id="audit-id-label">{{ audit_id }}</span></p>
+      <h1 id="audit-url-label">Preparing your page audit</h1>
+    </div>
+    <a class="text-link" href="/">New audit <span aria-hidden="true">&#8599;</span></a>
+  </header>
+
+  <section class="progress-panel" aria-labelledby="progress-title">
+    <div class="section-heading"><div><p class="panel-kicker">LIVE PIPELINE</p><h2 id="progress-title">Reading the page</h2></div><span id="audit-status" class="status-badge">Pending</span></div>
+    <div id="stepper" class="stepper" aria-live="polite"></div>
+    <p id="stage-message" class="stage-message">Starting the coordinator.</p>
+  </section>
+
+  <section id="agent-panel" class="agent-panel is-hidden" aria-labelledby="agent-title">
+    <div class="section-heading"><div><p class="panel-kicker">STEP 2</p><h2 id="agent-title">Choose an evaluation</h2></div></div>
+    <div id="agent-list" class="agent-list"></div>
+  </section>
+
+  <section id="report-panel" class="report-panel is-hidden" aria-labelledby="report-title">
+    <div class="report-topline"><div><p class="panel-kicker">AUDIT REPORT</p><h2 id="report-title">The page, decoded</h2></div><button id="download-report" class="btn btn-outline-dark" type="button">Download JSON <span aria-hidden="true">&#8595;</span></button></div>
+    <div class="score-grid">
+      <div class="score-card"><span class="score-label">Overall score</span><div class="score-ring"><strong id="score-value">--</strong><span>%</span></div><span id="score-points" class="muted-label">-- points earned</span></div>
+      <div class="metric-card"><span class="score-label">Coverage</span><strong id="coverage-value">--%</strong><p>of weighted checks were applicable</p><span id="coverage-note" class="coverage-note"></span></div>
+      <div class="metric-card"><span class="score-label">Comparison</span><strong id="delta-value">--</strong><p>change from the previous run</p><span id="delta-note" class="coverage-note"></span></div>
+    </div>
+    <div id="narrative" class="narrative-grid"></div>
+    <div id="charts" class="chart-grid"></div>
+    <div class="findings-section"><div class="section-heading"><div><p class="panel-kicker">CHECK RESULTS</p><h2>Findings</h2></div><span id="finding-count" class="muted-label"></span></div><div id="findings-table" class="table-responsive"></div></div>
+    <div id="unknown-section" class="unknown-section is-hidden"><p class="panel-kicker">NOT COUNTED AGAINST YOU</p><h2>Could not be verified</h2><p>These checks were unknown because the collector could not observe enough information.</p><ul id="unknown-list"></ul></div>
+  </section>
+  <div id="page-error" class="page-error" role="alert"></div>
+</div>
+{% endblock %}
+{% block scripts %}<script>window.SIGNAL_AUDIT_ID = "{{ audit_id }}";</script>{% endblock %}
