@@ -217,4 +217,9 @@ marimo/_lsp/
 __marimo__/
 
 # Streamlit
-.streamlit/secrets.toml
+.streamlit/secrets.toml.venv/
+.env
+__pycache__/
+node_modules/
+.next/
+db.sqlite3

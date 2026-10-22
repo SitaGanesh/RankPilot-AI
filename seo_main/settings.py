@@ -55,6 +55,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+APPEND_SLASH = False
+
 ROOT_URLCONF = 'seo_main.urls'
 
 TEMPLATES = [
@@ -135,6 +137,22 @@ REST_FRAMEWORK = {
 
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 GROQ_MODEL = os.getenv('GROQ_MODEL', '')
+
+# Optional search and backlink intelligence. Credentials stay in the environment.
+GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
+GSC_PROPERTY_URL = os.getenv('GSC_PROPERTY_URL', '')
+GSC_SERVICE_ACCOUNT_FILE = os.getenv('GSC_SERVICE_ACCOUNT_FILE', '')
+GSC_OAUTH_TOKEN_FILE = os.getenv('GSC_OAUTH_TOKEN_FILE', '')
+SEO_SEARCH_IMPORT_DIR = os.getenv('SEO_SEARCH_IMPORT_DIR', '')
+VISIBILITY_BRAND_TERMS = os.getenv('VISIBILITY_BRAND_TERMS', '')
+BACKLINK_PROVIDER = os.getenv('BACKLINK_PROVIDER', '')
+BACKLINK_API_KEY = os.getenv('BACKLINK_API_KEY', '')
+SEO_BACKLINK_IMPORT_DIR = os.getenv('SEO_BACKLINK_IMPORT_DIR', '')
+GA4_PROPERTY_ID = os.getenv('GA4_PROPERTY_ID', '')
+GA4_IMPORT_DIR = os.getenv('GA4_IMPORT_DIR', '')
+SEO_BATCH_WORKERS = min(16, max(1, int(os.getenv('SEO_BATCH_WORKERS', '4'))))
 
 LOGGING = {
     'version': 1,

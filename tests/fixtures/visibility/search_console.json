@@ -1,0 +1,90 @@
+{
+  "source": "google_search_console_export",
+  "provider": "imported_dataset",
+  "property": "https://example.com/",
+  "retrieved_at": "2026-10-15T00:00:00+00:00",
+  "coverage_note": "Page and query export for tests",
+  "freshness_note": "retrieved_at=2026-10-15T00:00:00+00:00",
+  "date_range": {"start": "2026-09-01", "end": "2026-09-30"},
+  "brand_terms": ["example"],
+  "pages": [
+    {
+      "url": "https://example.com/widgets",
+      "impressions": 2400,
+      "clicks": 48,
+      "ctr": 0.02,
+      "average_position": 8.4,
+      "indexed": true,
+      "coverage_state": "Submitted and indexed",
+      "canonical_url": "https://example.com/widgets"
+    },
+    {
+      "url": "https://example.com/products",
+      "impressions": 900,
+      "clicks": 30,
+      "ctr": 0.033,
+      "average_position": 11.2,
+      "indexed": true,
+      "coverage_state": "Submitted and indexed",
+      "canonical_url": "https://example.com/products"
+    }
+  ],
+  "queries": [
+    {
+      "url": "https://example.com/widgets",
+      "query": "example widgets",
+      "impressions": 800,
+      "clicks": 40,
+      "ctr": 0.05,
+      "average_position": 4.2
+    },
+    {
+      "url": "https://example.com/widgets",
+      "query": "blue widgets",
+      "impressions": 1000,
+      "clicks": 10,
+      "ctr": 0.01,
+      "average_position": 5.0
+    },
+    {
+      "url": "https://example.com/widgets",
+      "query": "quantum widget calibration",
+      "impressions": 200,
+      "clicks": 2,
+      "ctr": 0.01,
+      "average_position": 18.0
+    },
+    {
+      "url": "https://example.com/widgets",
+      "query": "widgets",
+      "impressions": 400,
+      "clicks": 16,
+      "ctr": 0.04,
+      "average_position": 7.1
+    },
+    {
+      "url": "https://example.com/products",
+      "query": "widgets",
+      "impressions": 350,
+      "clicks": 14,
+      "ctr": 0.04,
+      "average_position": 9.4
+    }
+  ],
+  "daily": [
+    {"url": "https://example.com/widgets", "date": "2026-09-01", "impressions": 120, "clicks": 8},
+    {"url": "https://example.com/widgets", "date": "2026-09-02", "impressions": 110, "clicks": 7},
+    {"url": "https://example.com/widgets", "date": "2026-09-03", "impressions": 130, "clicks": 9},
+    {"url": "https://example.com/widgets", "date": "2026-09-04", "impressions": 125, "clicks": 8},
+    {"url": "https://example.com/widgets", "date": "2026-09-05", "impressions": 118, "clicks": 7},
+    {"url": "https://example.com/widgets", "date": "2026-09-06", "impressions": 122, "clicks": 8},
+    {"url": "https://example.com/widgets", "date": "2026-09-07", "impressions": 115, "clicks": 6},
+    {"url": "https://example.com/widgets", "date": "2026-09-08", "impressions": 80, "clicks": 3},
+    {"url": "https://example.com/widgets", "date": "2026-09-09", "impressions": 70, "clicks": 2},
+    {"url": "https://example.com/widgets", "date": "2026-09-10", "impressions": 75, "clicks": 2},
+    {"url": "https://example.com/widgets", "date": "2026-09-11", "impressions": 68, "clicks": 2},
+    {"url": "https://example.com/widgets", "date": "2026-09-12", "impressions": 72, "clicks": 1},
+    {"url": "https://example.com/widgets", "date": "2026-09-13", "impressions": 60, "clicks": 1},
+    {"url": "https://example.com/widgets", "date": "2026-09-14", "impressions": 65, "clicks": 1}
+  ]
+}

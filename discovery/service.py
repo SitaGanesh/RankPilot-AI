@@ -24,6 +24,7 @@ class CrawlLimits:
     max_depth: int = 3
     max_sitemaps: int = 10
     per_host_requests: int = 20
+    single_page: bool = False
 
 
 class RequestBudgetExceeded(FetchError):
@@ -85,7 +86,11 @@ def _sitemap_locations(body: bytes) -> tuple[list[str], bool]:
 class URLDiscoveryService:
     def __init__(self, audit: Audit, limits: CrawlLimits | None = None):
         self.audit = audit
-        self.limits = limits or CrawlLimits()
+        if limits is None:
+            # Default for single-URL audit: non-recursive, single primary page fetch
+            self.limits = CrawlLimits(max_pages=500, max_depth=1, single_page=True)
+        else:
+            self.limits = limits
         self.root_url = normalize_url(audit.normalized_url)
         self.host = (urlsplit(self.root_url).hostname or "").lower()
         self.host_requests = 0
@@ -202,7 +207,8 @@ class URLDiscoveryService:
             root = self._enqueue(self.root_url, 0)
             if root is None:
                 return []
-            self._discover_sitemaps()
+            if not self.limits.single_page:
+                self._discover_sitemaps()
             while True:
                 current = (
                     CrawlURL.objects.select_for_update()
@@ -211,6 +217,8 @@ class URLDiscoveryService:
                     .first()
                 )
                 if current is None:
+                    break
+                if self.limits.single_page and current.depth > 0:
                     break
                 current.status = CrawlURL.Status.FETCHING
                 current.save(update_fields=["status", "updated_at"])

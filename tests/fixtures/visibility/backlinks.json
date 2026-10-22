@@ -1,0 +1,132 @@
+{
+  "source": "imported_dataset",
+  "provider": "manual_import",
+  "retrieved_at": "2026-10-15T00:00:00+00:00",
+  "allowlist_domains": ["en.wikipedia.org"],
+  "records": [
+    {
+      "source_url": "https://news.example.net/review",
+      "source_domain": "news.example.net",
+      "destination_url": "https://example.com/widgets",
+      "anchor_text": "Example widgets",
+      "link_element_type": "text",
+      "rel": [],
+      "discovered_at": "2026-08-01T00:00:00+00:00",
+      "last_seen_at": "2026-10-01T00:00:00+00:00",
+      "source_status": 200,
+      "destination_status": 200,
+      "verified": true
+    },
+    {
+      "source_url": "https://news.example.net/review",
+      "source_domain": "news.example.net",
+      "destination_url": "https://example.com/widgets",
+      "anchor_text": "Example widgets",
+      "link_element_type": "text",
+      "rel": [],
+      "discovered_at": "2026-08-01T00:00:00+00:00",
+      "last_seen_at": "2026-09-01T00:00:00+00:00",
+      "source_status": 200,
+      "destination_status": 200,
+      "verified": true
+    },
+    {
+      "source_url": "https://partner.example.org/logo",
+      "source_domain": "partner.example.org",
+      "destination_url": "https://example.com/widgets",
+      "anchor_text": "Partner logo",
+      "image_alt": "Example widgets",
+      "link_element_type": "image",
+      "rel": ["nofollow"],
+      "discovered_at": "2026-07-01T00:00:00+00:00",
+      "last_seen_at": "2026-10-01T00:00:00+00:00",
+      "source_status": 200,
+      "destination_status": 200,
+      "verified": true
+    },
+    {
+      "source_url": "https://frames.example.net/embed",
+      "source_domain": "frames.example.net",
+      "destination_url": "https://example.com/widgets",
+      "anchor_text": "",
+      "link_element_type": "iframe",
+      "rel": ["ugc"],
+      "discovered_at": "2026-06-01T00:00:00+00:00",
+      "last_seen_at": "2026-10-01T00:00:00+00:00",
+      "source_status": 200,
+      "destination_status": 200,
+      "verified": true
+    },
+    {
+      "source_url": "https://forms.example.net/submit",
+      "source_domain": "forms.example.net",
+      "destination_url": "https://example.com/widgets",
+      "anchor_text": "click here",
+      "link_element_type": "form",
+      "rel": ["sponsored"],
+      "discovered_at": "2026-05-01T00:00:00+00:00",
+      "last_seen_at": "2026-10-01T00:00:00+00:00",
+      "source_status": 200,
+      "destination_status": 301,
+      "verified": true
+    },
+    {
+      "source_url": "https://en.wikipedia.org/wiki/Widget",
+      "source_domain": "en.wikipedia.org",
+      "destination_url": "https://example.com/widgets",
+      "anchor_text": "widget",
+      "link_element_type": "text",
+      "rel": ["nofollow"],
+      "discovered_at": "2026-01-01T00:00:00+00:00",
+      "last_seen_at": "2026-10-01T00:00:00+00:00",
+      "source_status": 200,
+      "destination_status": 200,
+      "verified": true
+    },
+    {
+      "source_url": "https://old.example.net/gone",
+      "source_domain": "old.example.net",
+      "destination_url": "https://example.com/widgets",
+      "anchor_text": "widgets",
+      "link_element_type": "text",
+      "rel": [],
+      "discovered_at": "2025-01-01T00:00:00+00:00",
+      "last_seen_at": "2026-10-01T00:00:00+00:00",
+      "source_status": 200,
+      "destination_status": 404,
+      "verified": true
+    },
+    {
+      "source_domain": "unverified.example",
+      "anchor_text": "widgets",
+      "link_element_type": "text"
+    },
+    {
+      "source_url": "not-an-object-skip"
+    }
+  ],
+  "previous_snapshot": {
+    "captured_at": "2026-09-01T00:00:00+00:00",
+    "provenance": "imported_dataset",
+    "records": [
+      {
+        "source_url": "https://news.example.net/review",
+        "source_domain": "news.example.net",
+        "destination_url": "https://example.com/widgets",
+        "anchor_text": "Example widgets",
+        "link_element_type": "text",
+        "rel": [],
+        "verified": true
+      },
+      {
+        "source_url": "https://retired.example.net/post",
+        "source_domain": "retired.example.net",
+        "destination_url": "https://example.com/widgets",
+        "anchor_text": "widgets",
+        "link_element_type": "text",
+        "rel": [],
+        "verified": true
+      }
+    ]
+  }
+}

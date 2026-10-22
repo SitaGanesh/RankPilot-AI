@@ -211,6 +211,28 @@ Discovery removes URL fragments, normalizes trailing slashes, preserves query st
 
 The immediate development priority is full-domain URL discovery and persistent crawl state. Subsequent stages will introduce asynchronous processing, independent page reports, domain-wide analysis, search-performance integrations, and continuous monitoring.
 
+Phase 4 adds a separate seed-only batch API without changing the single-page audit API:
+
+- `POST /api/batches/` accepts 1-25 validated URLs and an idempotency key.
+- `GET /api/batches/<batch_id>/` returns batch progress and per-target evidence.
+- `POST /api/batches/<batch_id>/resume/`, `/retry/`, and `/cancel/` manage bounded lifecycle actions.
+- The configured 25-page IB tutoring seed set is available in `audits/batch_seeds.py`; callers still submit it as input.
+- Seed-only mode is the default. Optional bounded same-host internal-link discovery is enabled with `allow_internal_discovery`.
+- Batch targets retain the submitted URL separately from its normalized and redirect final URLs. Non-HTML responses are recorded as non-HTML evidence rather than HTML SEO failures.
+
+Batch execution is asynchronous and bounded: targets are collected in parallel waves using
+`SEO_BATCH_WORKERS` (four workers by default), while each status response exposes completed,
+failed, skipped, and still-pending targets. Cancellation is checked between waves, and SQLite
+uses serialized execution because its write locking is incompatible with concurrent workers.
+
+Phase 7 provider evidence is optional and server-side only. Search Console and backlink
+configuration remains explicit and unverified until a live client is enabled. GA4 landing-page
+exports can be attached through `GA4_IMPORT_DIR`; each JSON file must contain `pages` (or
+`rows`) with `landing_page`/`url` and available metrics such as `sessions`,
+`organic_sessions`, `referral_sessions`, and `conversions`. Missing provider data remains
+unavailable and is exposed through `GET /api/providers/status/`; credentials are never returned
+by the API.
+
 ## Project Vision
 
 Build a reliable, evidence-driven SEO intelligence platform that gives marketing and engineering teams visibility into every important page of a website, explains its technical and content weaknesses, connects page-level findings with domain-wide patterns, and helps teams prioritize improvements using measurable evidence.

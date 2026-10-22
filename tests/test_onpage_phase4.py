@@ -84,7 +84,7 @@ def test_check_results_match_declared_checklist_metadata():
 def test_registry_discovers_builtin_onpage_agent_by_stable_id():
     agents = list_agents()
 
-    assert [agent.agent_id for agent in agents] == ["onpage"]
+    assert "onpage" in [agent.agent_id for agent in agents]
     assert get_agent("onpage").agent_id == "onpage"
 
 

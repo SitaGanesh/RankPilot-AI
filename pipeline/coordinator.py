@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from agents import OnPageAgent  # noqa: F401 - ensures built-in registration
+import agents  # noqa: F401 - ensures built-in registration
 from collector.evidence import PageEvidence, collect_evidence
 from core.contracts import AgentResult, Finding, ScoreSummary
 from core.registry import get_agent
@@ -15,7 +15,15 @@ from pipeline.finding_validator import validate_findings
 from pipeline.report_builder import build_report
 from pipeline.stages import EventEmitter, Stage, StageStatus
 
-from audits.models import AgentRun, Audit, AuditReport, EvidenceSnapshot, StageEvent
+from audits.models import (
+    AgentRun,
+    Audit,
+    AuditReport,
+    CrawlLink,
+    CrawlURL,
+    EvidenceSnapshot,
+    StageEvent,
+)
 from discovery.service import URLDiscoveryService
 
 logger = logging.getLogger(__name__)
@@ -32,18 +40,89 @@ class SEOCoordinator:
         self.audit.save(update_fields=["current_stage"])
         StageEvent.objects.create(audit=self.audit, stage=stage.value, status=status.value, message=message)
 
+    def _sync_resource_graph_to_crawl(self, evidence: PageEvidence) -> None:
+        graph = evidence.resource_graph or {}
+        nodes = graph.get("nodes", [])
+        if not nodes:
+            return
+
+        primary_url = self.audit.normalized_url
+        primary_crawl, _ = CrawlURL.objects.update_or_create(
+            audit=self.audit,
+            url=primary_url,
+            defaults={
+                "depth": 0,
+                "status": CrawlURL.Status.FETCHED,
+                "resource_type": CrawlURL.ResourceType.PAGE,
+                "discovery_source": CrawlURL.DiscoverySource.SUBMITTED,
+                "final_url": evidence.final_url or primary_url,
+                "response_status": evidence.status or 200,
+            },
+        )
+
+        for node in nodes:
+            node_url = node.get("url")
+            if not node_url or node_url == primary_url:
+                continue
+            node_type = node.get("node_type", "")
+            res_type = (
+                CrawlURL.ResourceType.PAGE
+                if node_type == "linked_page"
+                else CrawlURL.ResourceType.MEDIA
+            )
+            check_st = node.get("status", "")
+            if check_st in ("available", "redirects"):
+                url_status = CrawlURL.Status.FETCHED
+            elif check_st in ("client_error", "server_error", "error"):
+                url_status = CrawlURL.Status.FAILED
+            else:
+                url_status = CrawlURL.Status.SKIPPED
+
+            disc_source = (
+                CrawlURL.DiscoverySource.INTERNAL_LINK
+                if node.get("is_internal")
+                else CrawlURL.DiscoverySource.SUBMITTED
+            )
+
+            child_crawl, _ = CrawlURL.objects.update_or_create(
+                audit=self.audit,
+                url=node_url,
+                defaults={
+                    "depth": 1,
+                    "status": url_status,
+                    "resource_type": res_type,
+                    "discovery_source": disc_source,
+                    "discovered_from": primary_crawl,
+                    "final_url": node.get("final_url", "") or node_url,
+                    "response_status": node.get("http_status"),
+                    "error": "; ".join(i.get("issue", "") for i in node.get("issues", [])),
+                },
+            )
+            CrawlLink.objects.get_or_create(
+                audit=self.audit, source=primary_crawl, destination=child_crawl
+            )
+
     def collect(self) -> PageEvidence:
         self.audit.status = Audit.Status.COLLECTING
         self.audit.save(update_fields=["status"])
         self._emit(Stage.COORDINATOR, StageStatus.RUNNING, "Starting website collection")
         self._emit(Stage.COLLECTOR, StageStatus.RUNNING, "Fetching page")
-        URLDiscoveryService(self.audit).run()
+        if self.audit.skip_discovery:
+            self._emit(
+                Stage.COLLECTOR,
+                StageStatus.RUNNING,
+                "Skipping URL discovery (seed-only collection)",
+            )
+        else:
+            URLDiscoveryService(self.audit).run()
         evidence = collect_evidence(self.audit.normalized_url)
         EvidenceSnapshot.objects.create(audit=self.audit, json=evidence.model_dump(mode="json"))
         if evidence.collection_errors:
             self.audit.status = Audit.Status.FAILED
             self._emit(Stage.COLLECTOR, StageStatus.FAILED, "Website collection could not be completed")
         else:
+            if not self.audit.skip_discovery:
+                self._sync_resource_graph_to_crawl(evidence)
             self.audit.status = Audit.Status.COLLECTED
             self._emit(Stage.COLLECTOR, StageStatus.DONE, "Page collected and parsed")
         self.audit.save(update_fields=["status"])
@@ -139,8 +218,97 @@ class SEOCoordinator:
             agents=[result], findings=findings, score=score, final_audit=final_audit,
             comparison=comparison, stages=list(self.audit.stage_events.all()),
             previous_score=previous_score, llm_fallback=fallback,
+            resource_graph=evidence.resource_graph,
         )
         AuditReport.objects.create(audit=self.audit, agent_id=agent_id, normalized_url=self.audit.normalized_url, report_json=report)
+        self._emit(Stage.REPORT_BUILDER, StageStatus.DONE, "Report is ready")
+        self.audit.status = Audit.Status.COMPLETED
+        self.audit.save(update_fields=["status"])
+        return report
+
+    def run_all_agents(self) -> dict[str, Any]:
+        if self.audit.status not in {Audit.Status.COLLECTED, Audit.Status.RUNNING, Audit.Status.COMPLETED}:
+            raise ValueError("Collection must finish before agents can run")
+        snapshot = self.audit.evidence_snapshots.first()
+        if snapshot is None:
+            raise ValueError("No evidence snapshot exists")
+        evidence = PageEvidence.model_validate(snapshot.json)
+        self.audit.status = Audit.Status.RUNNING
+        self.audit.save(update_fields=["status"])
+        self._emit(Stage.SPECIALIZED_AGENT, StageStatus.RUNNING, "Running all SEO audit agents")
+
+        agent_ids = ["onpage", "technical", "ib_conversion", "visibility"]
+        results: list[AgentResult] = []
+        combined_weights: dict[str, float] = {}
+        for ag_id in agent_ids:
+            try:
+                agent = get_agent(ag_id)
+                combined_weights.update(agent.check_weights)
+                started = datetime.now(timezone.utc)
+                raw_res = agent.run(evidence)
+                res = AgentResult.model_validate(raw_res)
+                results.append(res)
+                AgentRun.objects.create(
+                    audit=self.audit,
+                    agent_id=ag_id,
+                    rule_version=res.rule_version,
+                    status=res.status.value,
+                    result_json=res.model_dump(mode="json"),
+                    score_percent=res.score.percent,
+                    started_at=started,
+                    finished_at=res.finished_at,
+                )
+            except Exception as e:
+                logger.warning("Agent %s failed during run_all_agents: %s", ag_id, e)
+
+        if not results:
+            raise ValueError("No agent results generated")
+
+        self._emit(Stage.SPECIALIZED_AGENT, StageStatus.DONE, f"{len(results)} agent checks completed")
+        self._emit(Stage.FINDING_VALIDATOR, StageStatus.RUNNING, "Validating findings and evidence")
+        all_raw_findings: list[Finding] = []
+        for r in results:
+            all_raw_findings.extend(r.findings)
+        findings = validate_findings(all_raw_findings, expected_weights=combined_weights)
+        self._emit(Stage.FINDING_VALIDATOR, StageStatus.DONE, "Findings validated")
+
+        self._emit(Stage.SCORING, StageStatus.RUNNING, "Calculating aggregated deterministic score")
+        total_w = sum(r.score.total_weight for r in results) or 100.0
+        findings, score = aggregate_findings(results, total_weight=total_w, expected_weights=combined_weights)
+        self._emit(Stage.SCORING, StageStatus.DONE, "Aggregated deterministic score calculated")
+        self._emit(Stage.AGGREGATOR, StageStatus.RUNNING, "Aggregating findings")
+        self._emit(Stage.AGGREGATOR, StageStatus.DONE, "Scores aggregated")
+
+        self._emit(Stage.COMPARISON, StageStatus.RUNNING, "Comparing with previous audit")
+        comparison = compare_findings([], findings)
+        self._emit(Stage.COMPARISON, StageStatus.DONE, "Comparison complete")
+
+        self._emit(Stage.FINAL_AUDIT_LLM, StageStatus.RUNNING, "Writing audit narrative")
+        final_audit, fallback = generate_final_audit(findings, score, comparison)
+        self._emit(Stage.FINAL_AUDIT_LLM, StageStatus.DONE, "Audit narrative generated")
+        self._emit(Stage.OUTPUT_VALIDATOR, StageStatus.RUNNING, "Validating output")
+        self._emit(Stage.OUTPUT_VALIDATOR, StageStatus.DONE, "Output validated")
+
+        self._emit(Stage.REPORT_BUILDER, StageStatus.RUNNING, "Building combined report")
+        report = build_report(
+            audit_id=str(self.audit.id),
+            url=self.audit.url,
+            rule_version=results[0].rule_version if results else "1.0",
+            agents=results,
+            findings=findings,
+            score=score,
+            final_audit=final_audit,
+            comparison=comparison,
+            stages=list(self.audit.stage_events.all()),
+            llm_fallback=fallback,
+            resource_graph=evidence.resource_graph,
+        )
+        AuditReport.objects.create(
+            audit=self.audit,
+            agent_id="all",
+            normalized_url=self.audit.normalized_url,
+            report_json=report,
+        )
         self._emit(Stage.REPORT_BUILDER, StageStatus.DONE, "Report is ready")
         self.audit.status = Audit.Status.COMPLETED
         self.audit.save(update_fields=["status"])
@@ -178,3 +346,29 @@ def run_agent(audit_id, agent_id: str) -> None:
             status=StageStatus.FAILED.value,
             message="Audit processing could not be completed",
         )
+
+
+def run_all_agents(audit_id) -> None:
+    audit = Audit.objects.get(pk=audit_id)
+    try:
+        SEOCoordinator(audit).run_all_agents()
+    except Exception:
+        logger.exception("run_all_agents failed for audit %s", audit_id)
+        audit.status = Audit.Status.FAILED
+        audit.save(update_fields=["status"])
+        StageEvent.objects.create(
+            audit=audit,
+            stage=audit.current_stage or Stage.SPECIALIZED_AGENT.value,
+            status=StageStatus.FAILED.value,
+            message="Audit processing could not be completed",
+        )
+
+
+def run_single_audit(audit_id) -> None:
+    """Execute complete single-URL deep audit pipeline: collection, shallow checks, and all agents."""
+    run_collection(audit_id)
+    audit = Audit.objects.get(pk=audit_id)
+    if audit.status == Audit.Status.COLLECTED:
+        run_all_agents(audit_id)
+
+

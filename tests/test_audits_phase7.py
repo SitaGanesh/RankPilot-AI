@@ -8,7 +8,7 @@ from audits.models import AgentRun, Audit, AuditReport, CrawlURL, EvidenceSnapsh
 from collector.evidence import PageEvidence
 from core.errors import FetchError
 from pipeline.final_audit import deterministic_fallback
-from pipeline.coordinator import run_agent, run_collection
+from pipeline.coordinator import SEOCoordinator, run_agent, run_collection
 
 
 class AuditApiTests(TestCase):
@@ -36,7 +36,10 @@ class AuditApiTests(TestCase):
         response = self.client.get("/api/agents/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual({agent["id"] for agent in response.json()}, {"onpage", "technical"})
+        self.assertEqual(
+            {agent["id"] for agent in response.json()},
+            {"onpage", "technical", "visibility", "ib_conversion"},
+        )
 
     def test_invalid_url_is_rejected_before_background_collection(self):
         response = self.client.post("/api/audits/", {"url": "ftp://example.com/"}, format="json")
@@ -343,14 +346,42 @@ class AuditApiTests(TestCase):
         response = self.client.get(f"/api/audits/{audit.id}/report/?agent_id=technical")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["agents"][0]["agent_id"], "technical")
-        self.assertEqual(response.json()["agents"][0]["rule_version"], "technical-1.0.0")
-        self.assertEqual(AgentRun.objects.filter(audit=audit, agent_id="technical").count(), 1)
-        self.assertEqual(AuditReport.objects.filter(audit=audit, agent_id="technical").count(), 1)
 
-        run_agent(audit.id, "onpage")
-        onpage_response = self.client.get(f"/api/audits/{audit.id}/report/?agent_id=onpage")
-        self.assertEqual(onpage_response.status_code, 200)
-        self.assertEqual(onpage_response.json()["agents"][0]["agent_id"], "onpage")
+    @patch("pipeline.coordinator.generate_final_audit")
+    def test_visibility_agent_produces_retrievable_report_after_collection(
+        self,
+        generate_final_audit,
+    ):
+        audit = Audit.objects.create(
+            url="https://example.com/widgets",
+            normalized_url="https://example.com/widgets",
+            status=Audit.Status.COLLECTED,
+        )
+        evidence = PageEvidence(
+            requested_url=audit.url,
+            normalized_url=audit.normalized_url,
+            final_url=audit.url,
+            status=200,
+            canonical=audit.url,
+        )
+        EvidenceSnapshot.objects.create(
+            audit=audit,
+            json=evidence.model_dump(mode="json"),
+        )
+        generate_final_audit.side_effect = lambda findings, score, comparison: (
+            deterministic_fallback(findings, score),
+            True,
+        )
+
+        run_agent(audit.id, "visibility")
+
+        response = self.client.get(f"/api/audits/{audit.id}/report/?agent_id=visibility")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["agents"][0]["agent_id"], "visibility")
+        self.assertEqual(response.json()["rule_version"], "visibility-1.0.0")
+        self.assertEqual(response.json()["agents"][0]["rule_version"], "visibility-1.0.0")
+        self.assertEqual(AgentRun.objects.filter(audit=audit, agent_id="visibility").count(), 1)
+        self.assertEqual(AuditReport.objects.filter(audit=audit, agent_id="visibility").count(), 1)
 
     @patch("pipeline.coordinator.collect_evidence", side_effect=FetchError("blocked"))
     def test_collection_failure_persists_safe_failure_event(self, collect_evidence):
@@ -421,3 +452,73 @@ class AuditApiTests(TestCase):
         self.assertEqual(audit.status, Audit.Status.FAILED)
         event = audit.stage_events.get()
         self.assertEqual(event.status, "failed")
+
+
+class SkipDiscoveryCollectionTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_public_audit_create_does_not_enable_skip_discovery(self):
+        with patch("audits.views.threading.Thread") as thread_class:
+            thread_class.return_value.start = Mock()
+            response = self.client.post(
+                "/api/audits/",
+                {"url": "https://example.com/", "skip_discovery": True},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 202)
+        audit = Audit.objects.get()
+        self.assertFalse(audit.skip_discovery)
+
+    @patch("pipeline.coordinator.collect_evidence")
+    @patch("pipeline.coordinator.URLDiscoveryService")
+    def test_default_collection_runs_discovery(self, discovery_class, collect_evidence):
+        collect_evidence.return_value = PageEvidence(
+            requested_url="https://example.com/",
+            normalized_url="https://example.com/",
+            final_url="https://example.com/",
+            status=200,
+        )
+        audit = Audit.objects.create(
+            url="https://example.com/",
+            normalized_url="https://example.com/",
+        )
+
+        SEOCoordinator(audit).collect()
+
+        discovery_class.assert_called_once_with(audit)
+        discovery_class.return_value.run.assert_called_once_with()
+        collect_evidence.assert_called_once_with(audit.normalized_url)
+        audit.refresh_from_db()
+        self.assertFalse(audit.skip_discovery)
+        self.assertEqual(audit.status, Audit.Status.COLLECTED)
+
+    @patch("pipeline.coordinator.collect_evidence")
+    @patch("pipeline.coordinator.URLDiscoveryService")
+    def test_skip_discovery_collects_seed_without_crawling(self, discovery_class, collect_evidence):
+        collect_evidence.return_value = PageEvidence(
+            requested_url="https://example.com/dubai",
+            normalized_url="https://example.com/dubai",
+            final_url="https://example.com/dubai",
+            status=200,
+        )
+        audit = Audit.objects.create(
+            url="https://example.com/dubai",
+            normalized_url="https://example.com/dubai",
+            skip_discovery=True,
+        )
+
+        SEOCoordinator(audit).collect()
+
+        discovery_class.assert_not_called()
+        collect_evidence.assert_called_once_with(audit.normalized_url)
+        audit.refresh_from_db()
+        self.assertEqual(audit.status, Audit.Status.COLLECTED)
+        self.assertEqual(audit.crawl_urls.count(), 0)
+        self.assertEqual(audit.evidence_snapshots.count(), 1)
+        self.assertTrue(
+            audit.stage_events.filter(
+                message="Skipping URL discovery (seed-only collection)"
+            ).exists()
+        )

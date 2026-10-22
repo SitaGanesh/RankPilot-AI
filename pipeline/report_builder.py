@@ -36,8 +36,9 @@ def build_report(
     errors: list[str] | None = None,
     previous_score: ScoreSummary | None = None,
     llm_fallback: bool = False,
+    resource_graph: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Return the stable final audit JSON shape with embedded charts."""
+    """Return the stable final audit JSON shape with embedded charts and resource graph."""
 
     return {
         "audit_id": audit_id,
@@ -61,4 +62,5 @@ def build_report(
         "charts": render_charts(findings, score, previous_score),
         "stages": [_serialize_stage(stage) for stage in (stages or [])],
         "errors": errors or [],
+        "resource_graph": resource_graph or {},
     }
