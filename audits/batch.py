@@ -1,5 +1,6 @@
 """Bounded, seed-only batch crawling using the existing secure evidence collector."""
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -8,12 +9,15 @@ from django.conf import settings
 from django.db import close_old_connections, connection, models
 from django.db import transaction
 
+from collector.backlinks import confirmed_records
 from collector.evidence import collect_evidence
 from core.security import SecurityError, validate_url
 from discovery.service import normalize_url
 
 from .models import AuditBatch, BatchTarget
 from .batch_agents import run_agents_for_page
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,7 @@ def run_batch(batch_id, policy: BatchCrawlPolicy | None = None) -> None:
         ).order_by("position", "id")[:worker_count])
         if not targets:
             break
-        if connection.vendor == "sqlite":
+        if connection.vendor == "sqlite" or connection.in_atomic_block:
             # SQLite serializes writes and Django's transactional test runner
             # cannot share its test connection with worker threads.
             worker_count = 1
@@ -94,11 +98,24 @@ def _crawl_target(batch: AuditBatch, target: BatchTarget, policy: BatchCrawlPoli
         target.image_count = len(evidence.images)
         target.internal_link_count = sum(1 for link in evidence.links if link.get("internal"))
         target.external_link_count = sum(1 for link in evidence.links if not link.get("internal"))
-        target.broken_link_count = (
-            len([r for r in evidence.backlinks.confirmed_links if r.destination_status and r.destination_status >= 400])
-            if evidence.backlinks and evidence.backlinks.status.available
-            else 0
-        )
+        # Backlink evidence is optional. Use the documented helper and isolate
+        # provider/parse failures from the rest of the crawl so available
+        # backlink data can never turn an otherwise valid audit into FAILED.
+        target.broken_link_count = 0
+        if evidence.backlinks is not None and evidence.backlinks.status.available:
+            try:
+                target.broken_link_count = len(
+                    [
+                        record
+                        for record in confirmed_records(evidence.backlinks)
+                        if record.destination_status and record.destination_status >= 400
+                    ]
+                )
+            except Exception as exc:  # noqa: BLE001 - malformed provider payload
+                logger.warning(
+                    "Backlink evidence could not be read for target %s: %s", target.pk, exc
+                )
+                target.broken_link_count = 0
         target.completed_at = _now()
         if evidence.collection_errors:
             target.status = BatchTarget.Status.FAILED
@@ -119,7 +136,7 @@ def _crawl_target(batch: AuditBatch, target: BatchTarget, policy: BatchCrawlPoli
             _enqueue_internal_targets(batch, target, evidence.links)
         if not evidence.collection_errors and target.html:
             run_agents_for_page(target, evidence)
-    except (SecurityError, ValueError, Exception) as exc:
+    except Exception as exc:  # noqa: BLE001 - every target failure is recorded
         target.status = BatchTarget.Status.FAILED
         target.analysis_status = BatchTarget.AnalysisStatus.FAILED
         target.error = str(exc)

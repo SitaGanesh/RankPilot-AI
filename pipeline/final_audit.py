@@ -61,6 +61,7 @@ def generate_final_audit(
     comparison: dict[str, Any],
     *,
     model: Any | None = None,
+    evidence_context: dict[str, Any] | None = None,
 ) -> tuple[FinalAudit, bool]:
     """Generate, validate, retry once, and deterministically fall back."""
 
@@ -74,14 +75,18 @@ def generate_final_audit(
                 candidate = structured.invoke(_prompt(payload, retry_error))
                 validated = FinalAudit.model_validate(candidate)
                 from .output_validator import validate_final_audit
-                return validate_final_audit(validated, findings, score), False
+                return validate_final_audit(
+                    validated, findings, score, evidence_context=evidence_context
+                ), False
             except Exception as exc:
                 last_error = exc
         try:
             candidate = structured.invoke(_prompt(payload, str(last_error)))
             validated = FinalAudit.model_validate(candidate)
             from .output_validator import validate_final_audit
-            return validate_final_audit(validated, findings, score), False
+            return validate_final_audit(
+                validated, findings, score, evidence_context=evidence_context
+            ), False
         except Exception:
             pass
     except Exception:

@@ -9,6 +9,7 @@ from xml.etree import ElementTree
 import requests
 
 from core.errors import FetchError, SecurityError
+from core.netguard import create_session
 from core.security import MAX_REDIRECTS, validate_url
 
 from .fetcher import MAX_BODY_BYTES, TIMEOUT, USER_AGENT
@@ -64,8 +65,7 @@ def fetch_resource(
     normalized_url = validate_url(url)
     current_url = normalized_url
     redirect_chain: list[str] = []
-    session = requests.Session()
-    session.cookies.clear()
+    session = create_session()
     try:
         for _ in range(MAX_REDIRECTS + 1):
             if request_hook is not None:

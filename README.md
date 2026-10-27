@@ -1,238 +1,241 @@
 # Domain SEO Intelligence Platform
 
-**An evidence-driven platform for full-domain SEO auditing, page-level intelligence, and continuous website optimization.**
+An evidence-driven, asynchronous platform for single-page and full-domain SEO auditing, deterministic technical diagnostics, and AI-powered marketing intelligence.
 
-## 1. Overview
+---
 
-The Domain SEO Intelligence Platform is designed to analyze an entire website rather than only its homepage. It discovers pages across a domain, collects technical and content evidence, evaluates SEO issues, and generates actionable reports for individual pages and the website as a whole.
+## 1. What the Project Does
 
-The platform aims to help marketing and engineering teams understand how their website is structured, identify what is limiting search visibility, diagnose technical failures, improve content quality, and prioritize changes using evidence rather than assumptions.
+The **Domain SEO Intelligence Platform** performs end-to-end SEO audits that bridge the gap between deterministic technical checks and high-level marketing strategy.
 
-The initial implementation establishes the foundation through single-page On-Page SEO and Technical SEO analysis. The long-term objective is to evolve this into a scalable, asynchronous, full-domain intelligence system with historical monitoring and search-performance analysis.
+- **Audits Single Pages & Batches:** Crawls submitted URLs with SSRF protection, extracts metadata, evaluates HTML structure, and checks robots/sitemap resources.
+- **Deterministic 100-Point Scoring:** Runs strict, reproducible checks across 6 specialized audit dimensions. Scoring is 100% rule-based and never hallucinated.
+- **Live Real-Time Streaming:** Streams audit execution events, crawl progress, and stage status directly to the frontend over Server-Sent Events (SSE).
+- **AI-Powered Marketing Intelligence:** Uses Groq-hosted LLMs to turn deterministic findings into executive summaries, research briefs, and remediation proposals.
+- **Interactive Workspace UI:** Next.js frontend with split-panel views: live target website preview, dynamic single-page report, resource graph, and marketing insights.
 
-## 2. Problem Statement
+---
 
-A website consists of interconnected pages, resources, content, and technical dependencies. Analyzing only its homepage provides limited visibility into the website's overall SEO health.
+## 2. System Architecture
 
-Important problems include:
-
-- Pages that are undiscovered, poorly connected, or difficult to crawl.
-- Broken internal links, failed images, inaccessible resources, and redirect issues.
-- Missing or inconsistent metadata, indexing signals, structured data, and technical configurations.
-- Thin, duplicated, outdated, or insufficiently useful content.
-- Important pages with weak internal linking or incomplete topic coverage.
-- Limited visibility into page-level search performance and backlink profiles.
-- Difficulty identifying which problems deserve attention first and why.
-
-The platform addresses these problems by combining domain-wide crawling, structured evidence collection, deterministic SEO checks, AI-assisted content analysis, and consolidated reporting.
-
-## 3. Project Objectives
-
-1. **Full-domain discovery:** Discover eligible pages using sitemaps and internal links, with configurable crawl limits.
-2. **Page-level analysis:** Produce an independent SEO report for every discovered page.
-3. **Technical diagnostics:** Identify broken links, failed images, HTTP errors, indexing issues, metadata problems, and other technical findings.
-4. **Content intelligence:** Evaluate relevance, topic coverage, usefulness, duplication, content structure, and trust signals.
-5. **Site-wide analysis:** Understand internal-link relationships, crawl depth, orphan-page candidates, duplicate content, and related page opportunities.
-6. **Search visibility analysis:** Integrate authorized search-performance and external backlink data to investigate page and query performance.
-7. **Actionable recommendations:** Explain findings, supporting evidence, potential impact, and recommended corrective actions.
-8. **Asynchronous execution:** Analyze pages independently and make completed results available without waiting for the entire domain.
-9. **Continuous monitoring:** Detect meaningful changes, retain historical findings, and reanalyze affected pages efficiently.
-
-## 4. Intended Workflow
-
-A domain audit follows this high-level workflow:
-
-1. **Submit a domain:** Create an audit and initialize its crawl configuration.
-2. **Discover URLs:** Read available sitemaps, fetch eligible pages, and extract internal links.
-3. **Build the page inventory:** Normalize and deduplicate URLs, record link relationships, and schedule eligible pages.
-4. **Collect evidence:** Fetch page content and capture HTTP responses, metadata, resources, links, and relevant HTML structure.
-5. **Analyze pages:** Run deterministic SEO checks and specialized AI-assisted analysis against the collected evidence.
-6. **Generate page reports:** Persist findings and recommendations separately for each page as its analysis completes.
-7. **Aggregate domain intelligence:** Combine page findings, internal-link relationships, and available search data into a consolidated website report.
-8. **Monitor changes:** Compare subsequent crawls and update relevant findings, reports, and alerts.
-
-The crawler and analysis pipeline will operate independently. A failed page or slow analysis task should not prevent unrelated pages from progressing.
-
-## 5. System Architecture
-
-The target architecture separates crawling, evidence collection, analysis, persistence, and reporting.
+The following diagram illustrates how data flows from user submission to the live UI:
 
 ```mermaid
 flowchart TD
-    A[Domain Audit API] --> B[Audit Coordinator]
-    B --> C[URL Discovery and Scheduler]
-    C --> D[Sitemap Discovery]
-    C --> E[Internal Link Discovery]
-    D --> F[URL Frontier and Page Inventory]
-    E --> F
-    F --> G[Asynchronous Fetch Workers]
-    G --> H[Secure Collector and Evidence Extraction]
-    H --> I[Page Evidence and Link Graph]
-    I --> J[Technical SEO Checks]
-    I --> K[On-Page and Content Analysis]
-    I --> L[Internal Link Analysis]
-    J --> M[Findings and Validation]
-    K --> M
-    L --> M
-    M --> N[Page-Level Reports]
-    N --> O[Domain-Level Aggregation]
-    P[Search and External Data Integrations] --> O
-    O --> Q[SEO Intelligence Dashboard]
-    H --> F
+    subgraph Frontend["Frontend (Next.js 16 + React 19)"]
+        UI[Audit Workspace UI]
+        LivePanel[Live Browser Preview]
+        ReportPanel[Dynamic SEO Report Panel]
+        MktPanel[Marketing Intelligence Panel]
+        SSEClient[SSE Event Stream Listener]
+        UI --> LivePanel
+        UI --> ReportPanel
+        UI --> MktPanel
+        UI --> SSEClient
+    end
+
+    subgraph API["Backend API (Django REST Framework & ASGI)"]
+        Router[API Router & Controllers]
+        SSEStreamer[Live ASGI SSE Streamer]
+        DB[(Database: SQLite / PostgreSQL)]
+    end
+
+    subgraph Queue["Asynchronous Task Pipeline (Celery & Redis)"]
+        Redis[(Redis Broker)]
+        Worker[Celery Worker: Execution Engine]
+        Beat[Celery Beat: Periodic Schedulers]
+    end
+
+    subgraph Engine["Collection & Deterministic Evaluation"]
+        Collector[Secure Collector\nSSRF Guard & Fetcher]
+        Parser[HTML & Metadata Parser]
+        
+        subgraph Agents["Specialized Audit Agents"]
+            A1[On-Page Agent]
+            A2[Technical Agent]
+            A3[Connectivity Agent]
+            A4[Functionality Agent]
+            A5[Visibility Agent]
+            A6[IB Conversion Agent]
+        end
+
+        Scorer[Deterministic Scoring Engine\nPydantic Contract Validator]
+    end
+
+    subgraph LLM["AI Intelligence Layer (Groq)"]
+        GroqFactory[Groq Client Factory\nCircuit Breaker Protected]
+        MktAgent[Marketing Intelligence Agent\nBrief, Page & Site Synthesis]
+        Remediation[Remediation Proposal Generator]
+    end
+
+    %% User Interaction Flow
+    UI -->|POST /api/audits/ or /api/batches/| Router
+    Router -->|Dispatch Task| Redis
+    Redis --> Worker
+    Beat -->|Stale Task Recovery| Redis
+
+    %% Worker Execution Flow
+    Worker --> Collector
+    Collector --> Parser
+    Parser --> Agents
+    Agents --> Scorer
+    Scorer --> DB
+    
+    %% AI Flow
+    Scorer -->|Validated Evidence & Scores| GroqFactory
+    GroqFactory --> MktAgent
+    GroqFactory --> Remediation
+    MktAgent --> DB
+    Remediation --> DB
+
+    %% Streaming & Feedback Flow
+    Worker -.->|Emit Events| SSEStreamer
+    SSEStreamer -.->|EventSource Stream| SSEClient
+    Router -->|Read State| DB
 ```
 
-### Core components
+---
 
-| Component | Responsibility |
+## 3. Core Audit Agents & Engine
+
+| Agent / Component | Responsibility |
 |---|---|
-| Domain Audit API | Accept audit requests and expose progress and reports. |
-| Audit Coordinator | Manage the audit lifecycle and coordinate discovery, processing, and aggregation. |
-| URL Discovery and Scheduler | Discover, normalize, deduplicate, prioritize, and schedule eligible URLs. |
-| Secure Collector | Fetch approved resources while enforcing URL validation, network security, timeouts, and crawl limits. |
-| Page Evidence | Provide structured, reusable evidence to SEO checks and analysis agents. |
-| SEO Analysis Agents | Evaluate technical SEO, on-page structure, content quality, and other supported analysis domains. |
-| Findings and Validation | Store evidence-backed issues, severity, affected resources, and recommendations. |
-| Persistence Layer | Store audit state, page snapshots, link relationships, findings, and report versions. |
-| Domain Aggregator | Identify cross-page patterns, prioritize opportunities, and consolidate findings. |
-| Monitoring Pipeline | Detect changes between crawls and schedule targeted reanalysis. |
+| **On-Page Agent** | Title tags, meta descriptions, H1-H6 hierarchy, canonical URL, language, word count, open graph tags. |
+| **Technical Agent** | Status codes, redirect chains, HTTPS, robots directives, sitemap validation, JSON-LD structured data. |
+| **Connectivity Agent** | Internal links, external anchor validation, dead link detection, crawl depth, anchor text relevancy. |
+| **Functionality Agent** | Broken images, missing alt attributes, responsive viewport, assets availability. |
+| **Visibility Agent** | Search indexability, SERP snippet preview, canonical parity, orphan page risk. |
+| **IB Conversion Agent** | Specialized conversion audit for tutoring & lead capture forms, call-to-action placement. |
+| **Deterministic Scorer** | Applies strict 100-point rubric with configurable partial credits (`PASS`, `WARN`, `FAIL`, `UNKNOWN`). |
+| **Marketing Agent (Groq)** | Generates structured `ResearchBrief`, `PageReport`, and `SiteSynthesis` from collected evidence. |
 
-## 6. SEO Analysis Capabilities
+---
 
-### A. Technical SEO
+## 4. LLM Configuration (Groq API)
 
-- HTTP status codes, redirect chains, inaccessible pages, and server errors.
-- Titles, meta descriptions, heading structure, and canonical URLs.
-- Robots directives, sitemap membership, and indexability signals.
-- Broken internal links, failed images, missing alt attributes, and unavailable resources.
-- Structured data, HTTPS issues, duplicate URL variants, and rendering problems.
-- Page performance and Core Web Vitals where supporting measurements are available.
+The platform integrates **Groq** for high-speed narrative synthesis and remediation proposals.
 
-### B. On-Page and Content Intelligence
+> **Important:** The LLM **never** determines pass/fail statuses or modifies numerical scores. It is strictly advisory and operates on top of validated deterministic evidence.
 
-- Content relevance, search-intent alignment, and topic coverage.
-- Main-content extraction and page-structure quality.
-- Duplicate, near-duplicate, thin, or potentially outdated content.
-- Heading quality, internal anchor text, and contextual linking.
-- Authorship, factual support, usefulness, and relevant trust signals.
-- Evidence-based recommendations for improving page content.
+### Required Environment Variables
 
-AI-generated content will not be treated as inherently low quality. The platform will evaluate observable content quality and usefulness rather than claim to reliably determine authorship from text alone.
+Add these to your root `.env` file:
 
-### C. Domain-Wide Intelligence
+```env
+GROQ_API_KEY=gsk_your_actual_groq_api_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+```
 
-- Sitemap and internal-link coverage.
-- Crawl depth, incoming and outgoing links, and orphan-page candidates.
-- Broken link relationships and weakly connected pages.
-- Duplicate-content groups and potential competing pages.
-- Important pages that may need stronger contextual internal links.
-- Shared technical issues and recurring content-quality patterns.
+### Supported Models
+- **`llama-3.3-70b-versatile`** *(Recommended)* — Best balance of reasoning, structured output adherence, and speed.
+- `llama-3.1-8b-instant` — Fast, lightweight alternative for development/testing.
+- `mixtral-8x7b-32768` — Suitable for long context synthesis.
 
-### D. Search Performance and External Evidence
+### Built-in Circuit Breaker
+If the API key is missing, invalid, or rate-limited:
+- The system automatically **trips the LLM circuit breaker** for 5 minutes.
+- Audit runs will **continue without crashing**; deterministic scores and evidence are fully retained, while narrative sections display a graceful fallback notice.
 
-Where data sources are connected and available, the platform will analyze:
+---
 
-- Search queries, impressions, clicks, CTR, average position, and trends.
-- Page-level visibility and changes in search performance.
-- Potential keyword cannibalization and underperforming queries.
-- External backlinks, referring domains, and competitor-page evidence.
-- Relevant gaps between current page content and competing pages.
+## 5. Celery Asynchronous Processing
 
-The system will distinguish measured search performance from hypotheses about ranking causes. A crawl alone cannot establish why a search engine ranks one page above another.
+Celery handles long-running jobs including page fetching, multi-target batch crawling, agent execution, and periodic task recovery.
 
-## 7. Reporting and Recommendations
+### Why Celery is Required
+1. **Non-blocking Crawling:** Domain audits and batch analysis execute in the background without tying up HTTP request threads.
+2. **Task Resilience:** Jobs use `acks_late=True` with state recorded in the database.
+3. **Periodic Maintenance:** Celery Beat runs scheduled maintenance (e.g., `audits.recover_stale_tasks` to clean up abandoned crawls).
 
-Each discovered page will have its own report containing:
+### Running Celery
 
-- URL, crawl status, page type, and collection timestamp.
-- Technical SEO findings and affected resources.
-- On-page and content-quality observations.
-- Internal-link relationships and relevant domain context.
-- Search-performance metrics where available.
-- Evidence supporting each finding.
-- Severity, potential impact, and recommended corrective action.
-- Previous findings and changes when historical data is available.
+Ensure your Redis instance is running (`redis://localhost:6379/0`), then start the worker and scheduler:
 
-The consolidated domain report will summarize overall crawl coverage, technical issues, content opportunities, internal-link weaknesses, page-level performance patterns, and prioritized actions.
+```bash
+# 1. Start Celery Worker (Windows requires --pool=solo)
+celery -A seo_main worker -l info --pool=solo
 
-Recommendations will explain **what is wrong, where it occurs, what evidence supports the finding, why it matters, and what the team should do next.**
+# 2. Start Celery Beat Scheduler (in a separate terminal)
+celery -A seo_main beat -l info
+```
 
-## 8. Technology Stack
+*(On Linux / macOS, you can omit `--pool=solo` or use `--pool=prefork` / `-c 4`)*.
 
-### Existing foundation
+---
 
-- Python
-- Django REST Framework
-- Existing audit coordinator and secure collector
-- Shared `PageEvidence` structure
-- Agent registry and structured findings
-- Existing On-Page SEO and Technical SEO agents
-- Current database and reporting implementation
+## 6. Environment Setup & Configuration
 
-### Planned extensions
+Create a `.env` file in the project root:
 
-- Sitemap and full-domain crawling with a persistent URL frontier.
-- Asynchronous task processing, potentially using Celery and Redis.
-- PostgreSQL-backed page inventory, snapshots, link relationships, and report history, aligned with the existing database.
-- Selective browser rendering for JavaScript-dependent pages.
-- Search Console, PageSpeed Insights, and optional backlink-provider integrations.
-- Dashboard capabilities for crawl progress, page reports, site-wide findings, and historical changes.
+```env
+# Django Settings
+DEBUG=True
+DJANGO_SECRET_KEY=your-secure-secret-key
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 
-Planned technologies are architectural choices to validate against the existing codebase, not claims that these integrations are already implemented.
+# Groq LLM Settings
+GROQ_API_KEY=gsk_your_groq_api_key
+GROQ_MODEL=llama-3.3-70b-versatile
 
-## 9. Development Roadmap
+# Celery & Redis
+CELERY_BROKER_URL=redis://localhost:6379/0
+REDIS_URL=redis://localhost:6379/0
 
-| Stage | Focus | Expected outcome |
+# Optional Database (defaults to local SQLite if omitted)
+# DATABASE_URL=postgres://user:password@localhost:5432/seo_db
+```
+
+---
+
+## 7. Quickstart (Local Development)
+
+Open **4 terminal windows** to run the complete local environment:
+
+### Terminal 1: Backend API (Django)
+```powershell
+.\.venv\Scripts\activate
+python manage.py migrate
+python manage.py runserver 8000
+```
+*For ASGI SSE streaming in production, use: `uvicorn seo_main.asgi:application --port 8000`*
+
+### Terminal 2: Celery Worker
+```powershell
+.\.venv\Scripts\activate
+celery -A seo_main worker -l info --pool=solo
+```
+
+### Terminal 3: Celery Beat Scheduler
+```powershell
+.\.venv\Scripts\activate
+celery -A seo_main beat -l info
+```
+
+### Terminal 4: Frontend (Next.js)
+```powershell
+cd frontend
+npm run dev
+```
+
+Visit **`http://localhost:3000`** to access the SEO workspace.
+
+---
+
+## 8. Primary API Endpoints
+
+| Endpoint | Method | Description |
 |---|---|---|
-| 1. Existing foundation | Single-page collection and SEO analysis | Establish reliable page-level evidence and findings. |
-| 2. Domain discovery | Sitemaps, internal links, URL normalization, deduplication | Build a persistent inventory of discovered pages. |
-| 3. Asynchronous processing | Independent fetch and analysis tasks | Process pages concurrently and expose partial results. |
-| 4. Page reporting | Persisted findings and individual page reports | Generate a report for every analyzed page. |
-| 5. Domain intelligence | Link graph, duplicate content, shared issues, prioritization | Identify cross-page problems and opportunities. |
-| 6. Search intelligence | Search-performance and backlink integrations | Investigate measured visibility and potential ranking factors. |
-| 7. Continuous monitoring | Scheduled crawls, change detection, incremental reanalysis | Maintain current reports and track meaningful changes. |
+| `/api/audits/` | `POST` / `GET` | Create single-page audit or list past audits. |
+| `/api/audits/<id>/` | `GET` | Get audit details, scores, findings, and evidence. |
+| `/api/audits/<id>/stream/` | `GET` (SSE) | Live Server-Sent Events stream for real-time progress. |
+| `/api/batches/` | `POST` / `GET` | Submit batch crawl URLs (1–25 URLs) with idempotency key. |
+| `/api/batches/<id>/` | `GET` | Monitor batch progress across targets. |
+| `/api/providers/status/` | `GET` | Check external provider configuration (Search Console, GA4). |
 
-## 10. Reliability, Security, and Design Principles
+---
 
-- **Evidence first:** Findings must be traceable to collected evidence or a named external data source.
-- **Asynchronous by design:** Independent page tasks must not block one another.
-- **Bounded crawling:** Enforce domain scope, URL limits, timeouts, response-size limits, and per-host request limits.
-- **Secure collection:** Prevent SSRF, unsafe redirects, and access to internal network resources.
-- **Idempotent processing:** Retries must not create duplicate crawl jobs or findings.
-- **Incremental analysis:** Reanalyze changed evidence and affected dependencies where possible.
-- **Historical traceability:** Preserve meaningful changes between audit runs.
-- **Honest reporting:** Clearly distinguish observed facts, interpretations, unavailable data, and unverified hypotheses.
-- **Backward compatibility:** Extend the existing application without unnecessarily replacing its working components.
+## 9. Security & Reliability Principles
 
-## 11. Current Status
-
-The project currently has a foundational single-page SEO audit workflow with On-Page SEO and Technical SEO analysis. The first bounded discovery step is also implemented: each audit persists a breadth-first, same-host crawl frontier, sitemap/page discoveries, and internal-link edges while preserving the existing single-page evidence and API response. This is the starting point for the larger platform, not the completed product.
-
-Discovery removes URL fragments, normalizes trailing slashes, preserves query strings, rejects external hosts, revalidates secure redirects through the existing collector, and enforces configurable page, depth, sitemap, response, timeout, redirect, and per-host request limits. Pages are not analyzed as part of discovery; they remain available for a later worker-based analysis phase.
-
-The immediate development priority is full-domain URL discovery and persistent crawl state. Subsequent stages will introduce asynchronous processing, independent page reports, domain-wide analysis, search-performance integrations, and continuous monitoring.
-
-Phase 4 adds a separate seed-only batch API without changing the single-page audit API:
-
-- `POST /api/batches/` accepts 1-25 validated URLs and an idempotency key.
-- `GET /api/batches/<batch_id>/` returns batch progress and per-target evidence.
-- `POST /api/batches/<batch_id>/resume/`, `/retry/`, and `/cancel/` manage bounded lifecycle actions.
-- The configured 25-page IB tutoring seed set is available in `audits/batch_seeds.py`; callers still submit it as input.
-- Seed-only mode is the default. Optional bounded same-host internal-link discovery is enabled with `allow_internal_discovery`.
-- Batch targets retain the submitted URL separately from its normalized and redirect final URLs. Non-HTML responses are recorded as non-HTML evidence rather than HTML SEO failures.
-
-Batch execution is asynchronous and bounded: targets are collected in parallel waves using
-`SEO_BATCH_WORKERS` (four workers by default), while each status response exposes completed,
-failed, skipped, and still-pending targets. Cancellation is checked between waves, and SQLite
-uses serialized execution because its write locking is incompatible with concurrent workers.
-
-Phase 7 provider evidence is optional and server-side only. Search Console and backlink
-configuration remains explicit and unverified until a live client is enabled. GA4 landing-page
-exports can be attached through `GA4_IMPORT_DIR`; each JSON file must contain `pages` (or
-`rows`) with `landing_page`/`url` and available metrics such as `sessions`,
-`organic_sessions`, `referral_sessions`, and `conversions`. Missing provider data remains
-unavailable and is exposed through `GET /api/providers/status/`; credentials are never returned
-by the API.
-
-## Project Vision
-
-Build a reliable, evidence-driven SEO intelligence platform that gives marketing and engineering teams visibility into every important page of a website, explains its technical and content weaknesses, connects page-level findings with domain-wide patterns, and helps teams prioritize improvements using measurable evidence.
+- **Zero SSRF Policy:** All outbound URLs are resolved and validated against loopback, private ranges, link-local, and cloud metadata endpoints before fetching.
+- **Bounded Resource Limits:** 2 MB response limit, strict request timeouts, and at most 5 validated redirect hops.
+- **Deterministic Independence:** Checks operate on static `PageEvidence` snapshots. No check relies on non-deterministic external LLM responses for pass/fail decisions.

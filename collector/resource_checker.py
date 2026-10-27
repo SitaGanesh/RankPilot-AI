@@ -9,6 +9,7 @@ from urllib.parse import urljoin, urlsplit
 import requests
 
 from core.errors import FetchError, SecurityError
+from core.netguard import create_session
 from core.security import MAX_REDIRECTS, validate_url
 from collector.fetcher import REDIRECT_CODES, USER_AGENT
 
@@ -67,8 +68,7 @@ def check_single_url(
             "is_html": False,
         }
 
-    session = requests.Session()
-    session.cookies.clear()
+    session = create_session()
     current_url = validated_url
     redirect_chain: list[str] = []
     started = perf_counter()

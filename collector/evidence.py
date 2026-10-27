@@ -29,7 +29,12 @@ class PageEvidence(BaseModel):
     status: int | None = None
     headers: dict[str, str] = Field(default_factory=dict)
     raw_html_size: int = 0
+    observation_source: str = "html_parser"
     parsed_title: str | None = None
+    meta_description: str = ""
+    robots: str = ""
+    googlebot: str = ""
+    duplicate_ids: list[str] = Field(default_factory=list)
     meta_tags: dict[str, list[str]] = Field(default_factory=dict)
     canonical: str | None = None
     headings: list[dict[str, Any]] = Field(default_factory=list)
@@ -50,6 +55,11 @@ class PageEvidence(BaseModel):
     link_metadata: list[dict[str, Any]] = Field(default_factory=list)
     resource_checks: list[dict[str, Any]] = Field(default_factory=list)
     resource_graph: dict[str, Any] = Field(default_factory=dict)
+    navigation_summary: dict[str, Any] = Field(default_factory=dict)
+    forms_summary: dict[str, Any] = Field(default_factory=dict)
+    interactive_controls_summary: dict[str, Any] = Field(default_factory=dict)
+    layout_summary: dict[str, Any] = Field(default_factory=dict)
+    calls_to_action: list[dict[str, Any]] = Field(default_factory=list)
     fetch_timing_ms: float | None = None
     collection_errors: list[str] = Field(default_factory=list)
     robots_txt: ResourceObservation | None = None

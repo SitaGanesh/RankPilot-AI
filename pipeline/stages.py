@@ -12,6 +12,7 @@ class Stage(StrEnum):
     COLLECTOR = "collector"
     EVIDENCE = "evidence"
     SPECIALIZED_AGENT = "specialized_agent"
+    AGENTIC_INVESTIGATION = "agentic_investigation"
     FINDING_VALIDATOR = "finding_validator"
     SCORING = "scoring"
     AGGREGATOR = "aggregator"

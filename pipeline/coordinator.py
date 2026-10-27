@@ -7,7 +7,7 @@ from typing import Any
 import agents  # noqa: F401 - ensures built-in registration
 from collector.evidence import PageEvidence, collect_evidence
 from core.contracts import AgentResult, Finding, ScoreSummary
-from core.registry import get_agent
+from core.registry import get_agent, standard_agent_ids
 from pipeline.aggregator import aggregate_findings
 from pipeline.comparison import compare_findings
 from pipeline.final_audit import generate_final_audit
@@ -37,8 +37,45 @@ class SEOCoordinator:
 
     def _emit(self, stage: Stage, status: StageStatus, message: str) -> None:
         self.audit.current_stage = stage.value
-        self.audit.save(update_fields=["current_stage"])
+        self.audit.last_heartbeat = datetime.now(timezone.utc)
+        self.audit.save(update_fields=["current_stage", "last_heartbeat"])
         StageEvent.objects.create(audit=self.audit, stage=stage.value, status=status.value, message=message)
+
+    @staticmethod
+    def _narrative_context(evidence: PageEvidence, *, unknown_checks: int = 0) -> dict[str, Any]:
+        """Deterministic facts the narrative validator must respect."""
+
+        search = evidence.search_performance
+        return {
+            "search_console_available": bool(search is not None and search.status.available),
+            "verified_fixes": 0,
+            "collection_errors": list(evidence.collection_errors),
+            "unknown_checks": unknown_checks,
+        }
+
+    def _persist_report(self, agent_id: str, report: dict[str, Any]) -> None:
+        """Upsert the single report for this audit and agent.
+
+        ``AuditReport`` has a database uniqueness constraint; update_or_create
+        removes the previous duplicate-write race instead of relying on query
+        ordering in the report view.
+        """
+
+        from django.db import IntegrityError
+
+        try:
+            AuditReport.objects.update_or_create(
+                audit=self.audit,
+                agent_id=agent_id,
+                defaults={
+                    "normalized_url": self.audit.normalized_url,
+                    "report_json": report,
+                },
+            )
+        except IntegrityError:
+            AuditReport.objects.filter(audit=self.audit, agent_id=agent_id).update(
+                normalized_url=self.audit.normalized_url, report_json=report
+            )
 
     def _sync_resource_graph_to_crawl(self, evidence: PageEvidence) -> None:
         graph = evidence.resource_graph or {}
@@ -208,7 +245,17 @@ class SEOCoordinator:
         )
         self._emit(Stage.COMPARISON, StageStatus.DONE, "Previous audit comparison complete")
         self._emit(Stage.FINAL_AUDIT_LLM, StageStatus.RUNNING, "Writing audit narrative")
-        final_audit, fallback = generate_final_audit(findings, score, comparison)
+        try:
+            final_audit, fallback = generate_final_audit(
+                findings,
+                score,
+                comparison,
+                evidence_context=self._narrative_context(
+                    evidence, unknown_checks=len(result.checks_unknown)
+                ),
+            )
+        except TypeError:
+            final_audit, fallback = generate_final_audit(findings, score, comparison)
         self._emit(Stage.FINAL_AUDIT_LLM, StageStatus.DONE, "Audit narrative generated")
         self._emit(Stage.OUTPUT_VALIDATOR, StageStatus.RUNNING, "Validating final audit output")
         self._emit(Stage.OUTPUT_VALIDATOR, StageStatus.DONE, "Final audit output validated")
@@ -220,7 +267,7 @@ class SEOCoordinator:
             previous_score=previous_score, llm_fallback=fallback,
             resource_graph=evidence.resource_graph,
         )
-        AuditReport.objects.create(audit=self.audit, agent_id=agent_id, normalized_url=self.audit.normalized_url, report_json=report)
+        self._persist_report(agent_id, report)
         self._emit(Stage.REPORT_BUILDER, StageStatus.DONE, "Report is ready")
         self.audit.status = Audit.Status.COMPLETED
         self.audit.save(update_fields=["status"])
@@ -237,7 +284,9 @@ class SEOCoordinator:
         self.audit.save(update_fields=["status"])
         self._emit(Stage.SPECIALIZED_AGENT, StageStatus.RUNNING, "Running all SEO audit agents")
 
-        agent_ids = ["onpage", "technical", "ib_conversion", "visibility"]
+        # Registry-driven selection keeps the standard audit deterministic
+        # while allowing new agents to participate without editing this list.
+        agent_ids = standard_agent_ids()
         results: list[AgentResult] = []
         combined_weights: dict[str, float] = {}
         for ag_id in agent_ids:
@@ -284,7 +333,17 @@ class SEOCoordinator:
         self._emit(Stage.COMPARISON, StageStatus.DONE, "Comparison complete")
 
         self._emit(Stage.FINAL_AUDIT_LLM, StageStatus.RUNNING, "Writing audit narrative")
-        final_audit, fallback = generate_final_audit(findings, score, comparison)
+        try:
+            final_audit, fallback = generate_final_audit(
+                findings,
+                score,
+                comparison,
+                evidence_context=self._narrative_context(
+                    evidence, unknown_checks=sum(len(item.checks_unknown) for item in results)
+                ),
+            )
+        except TypeError:
+            final_audit, fallback = generate_final_audit(findings, score, comparison)
         self._emit(Stage.FINAL_AUDIT_LLM, StageStatus.DONE, "Audit narrative generated")
         self._emit(Stage.OUTPUT_VALIDATOR, StageStatus.RUNNING, "Validating output")
         self._emit(Stage.OUTPUT_VALIDATOR, StageStatus.DONE, "Output validated")
@@ -303,12 +362,7 @@ class SEOCoordinator:
             llm_fallback=fallback,
             resource_graph=evidence.resource_graph,
         )
-        AuditReport.objects.create(
-            audit=self.audit,
-            agent_id="all",
-            normalized_url=self.audit.normalized_url,
-            report_json=report,
-        )
+        self._persist_report("all", report)
         self._emit(Stage.REPORT_BUILDER, StageStatus.DONE, "Report is ready")
         self.audit.status = Audit.Status.COMPLETED
         self.audit.save(update_fields=["status"])
@@ -365,7 +419,27 @@ def run_all_agents(audit_id) -> None:
 
 
 def run_single_audit(audit_id) -> None:
-    """Execute complete single-URL deep audit pipeline: collection, shallow checks, and all agents."""
+    """Execute complete single-URL deep audit pipeline: agentic investigation or deterministic collection."""
+    audit = Audit.objects.get(pk=audit_id)
+    if audit.mode == Audit.Mode.AGENTIC:
+        from agentic.supervisor import create_investigation, run_investigation
+
+        investigation = audit.investigations.order_by("-created_at").first()
+        if investigation is None:
+            objective = audit.objective or (
+                f"Investigate the technical SEO health of {audit.url} and identify confirmed, "
+                "evidence-backed issues with the smallest sufficient set of inspections."
+            )
+            investigation = create_investigation(audit, objective)
+        run_investigation(investigation.id)
+        return
+
+    if getattr(audit, "audit_type", None) == Audit.AuditType.WEBSITE:
+        from pipeline.live_crawler import run_live_website_audit
+
+        run_live_website_audit(audit_id)
+        return
+
     run_collection(audit_id)
     audit = Audit.objects.get(pk=audit_id)
     if audit.status == Audit.Status.COLLECTED:

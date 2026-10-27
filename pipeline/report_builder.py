@@ -37,10 +37,33 @@ def build_report(
     previous_score: ScoreSummary | None = None,
     llm_fallback: bool = False,
     resource_graph: dict[str, Any] | None = None,
+    limitations: list[str] | None = None,
+    mode: str = "standard",
 ) -> dict[str, Any]:
     """Return the stable final audit JSON shape with embedded charts and resource graph."""
 
+    computed_limitations = list(limitations or [])
+    unknown = sum(1 for finding in findings if str(finding.status) == "unknown")
+    if unknown:
+        computed_limitations.append(
+            f"{unknown} check(s) returned UNKNOWN and were excluded from the score."
+        )
+    if score.coverage_percent < 100:
+        computed_limitations.append(
+            f"Score coverage is {score.coverage_percent:.1f}%; not every configured check could be evaluated."
+        )
+    if llm_fallback:
+        computed_limitations.append(
+            "The LLM narrative was unavailable or rejected; a deterministic summary was used."
+        )
+    if errors:
+        computed_limitations.append("One or more collection or processing errors were recorded.")
+    computed_limitations.append(
+        "This audit observes crawlable signals and cannot prove search-engine indexing or ranking outcomes."
+    )
+
     return {
+        "mode": mode,
         "audit_id": audit_id,
         "url": url,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -62,5 +85,6 @@ def build_report(
         "charts": render_charts(findings, score, previous_score),
         "stages": [_serialize_stage(stage) for stage in (stages or [])],
         "errors": errors or [],
+        "limitations": list(dict.fromkeys(computed_limitations)),
         "resource_graph": resource_graph or {},
     }

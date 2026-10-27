@@ -9,13 +9,19 @@ from typing import Any
 import agents  # noqa: F401 - register built-in agents
 from collector.evidence import PageEvidence
 from core.contracts import AgentResult
-from core.registry import get_agent
+from core.registry import get_agent, standard_agent_ids
 
 from .models import AuditBatch, BatchAgentRun, BatchTarget
 
 logger = logging.getLogger(__name__)
 
+# Retained for callers/tests that import the legacy tuple. Execution uses the
+# registry so newly registered agents participate without editing this module.
 REQUIRED_BATCH_AGENTS = ("onpage", "technical", "visibility", "ib_conversion")
+
+
+def required_agent_ids() -> tuple[str, ...]:
+    return tuple(standard_agent_ids())
 TRANSIENT_HTTP_STATUSES = {429, 500, 502, 503, 504}
 MAX_AGENT_ATTEMPTS = 3
 
@@ -114,7 +120,7 @@ def run_agents_for_page(batch_url: BatchTarget, evidence: PageEvidence) -> dict[
     results: dict[str, AgentResult] = {}
     batch_url.analysis_status = BatchTarget.AnalysisStatus.RUNNING
     batch_url.save(update_fields=["analysis_status", "updated_at"])
-    for agent_id in REQUIRED_BATCH_AGENTS:
+    for agent_id in required_agent_ids():
         try:
             results[agent_id] = execute_agent_independently(
                 batch_url=batch_url, evidence=evidence, agent_id=agent_id
@@ -128,7 +134,7 @@ def run_agents_for_page(batch_url: BatchTarget, evidence: PageEvidence) -> dict[
 
 def recompute_url_status(batch_url: BatchTarget) -> str:
     runs = list(batch_url.agent_runs.all())
-    if len(runs) < len(REQUIRED_BATCH_AGENTS) or any(
+    if len(runs) < len(required_agent_ids()) or any(
         run.status == BatchAgentRun.Status.RUNNING for run in runs
     ):
         status = BatchTarget.AnalysisStatus.RUNNING

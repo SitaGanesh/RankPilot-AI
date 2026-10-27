@@ -35,7 +35,7 @@ interface ResourceGraphProps {
   onAuditUrl: (url: string) => void;
 }
 
-type FilterCategory = "all" | "internal" | "external" | "images" | "scripts_css" | "issues";
+type FilterCategory = "all" | "internal" | "external" | "images" | "scripts_css" | "orphans" | "issues";
 type ViewMode = "graph" | "cards";
 
 export function ResourceGraphView({
@@ -75,6 +75,8 @@ export function ResourceGraphView({
       list = list.filter((n) => n.node_type === "image" || n.node_type === "media");
     } else if (filter === "scripts_css") {
       list = list.filter((n) => n.node_type === "script" || n.node_type === "stylesheet");
+    } else if (filter === "orphans") {
+      list = list.filter((n) => n.is_orphan);
     } else if (filter === "issues") {
       list = list.filter(
         (n) =>
@@ -97,6 +99,7 @@ export function ResourceGraphView({
       external: nodes.filter((n) => !n.is_internal && n.node_type === "linked_page").length,
       images: nodes.filter((n) => n.node_type === "image" || n.node_type === "media").length,
       scripts_css: nodes.filter((n) => n.node_type === "script" || n.node_type === "stylesheet").length,
+      orphans: nodes.filter((n) => n.is_orphan).length,
       issues: nodes.filter(
         (n) =>
           n.status === "client_error" ||
@@ -304,6 +307,16 @@ export function ResourceGraphView({
             }`}
           >
             Styles & Scripts ({counts.scripts_css})
+          </button>
+          <button
+            onClick={() => setFilter("orphans")}
+            className={`rounded-lg px-3 py-1.5 font-medium transition ${
+              filter === "orphans"
+                ? "bg-amber-600 text-white"
+                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+            }`}
+          >
+            Potential Orphans ({counts.orphans})
           </button>
           <button
             onClick={() => setFilter("issues")}
@@ -613,6 +626,12 @@ export function ResourceGraphView({
                       {node.url}
                     </p>
 
+                    {node.is_orphan && !isPrimary && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <span>⚠️ Potential Orphan (0 inbound links in crawl)</span>
+                      </div>
+                    )}
+
                     {node.issues && node.issues.length > 0 && (
                       <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-rose-600">
                         <AlertCircle size={13} />
@@ -621,9 +640,14 @@ export function ResourceGraphView({
                     )}
 
                     <div className="mt-3.5 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
-                      <span className="text-[11px] text-slate-400">
-                        {node.is_internal ? "Internal" : "External"}
-                      </span>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                        <span>{node.is_internal ? "Internal" : "External"}</span>
+                        {node.in_degree !== undefined && (
+                          <span className="font-mono text-slate-500">
+                            · in:{node.in_degree} out:{node.out_degree ?? 0}
+                          </span>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-2">
                         <button

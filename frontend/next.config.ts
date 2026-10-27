@@ -22,6 +22,14 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${DJANGO_URL}/api/:path*`,
       },
+      {
+        source: "/marketing-api/:path*/",
+        destination: `${DJANGO_URL}/marketing-api/:path*/`,
+      },
+      {
+        source: "/marketing-api/:path*",
+        destination: `${DJANGO_URL}/marketing-api/:path*`,
+      },
     ];
   },
   experimental: {

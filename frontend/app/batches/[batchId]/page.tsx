@@ -564,7 +564,7 @@ function BatchReportContent() {
               {[
                 { key: "onpage", label: "On-Page SEO", icon: Sparkles, desc: "Titles, Headings, Meta" },
                 { key: "technical", label: "Technical SEO", icon: CheckCircle2, desc: "Crawlability, HTTP, Timing" },
-                { key: "ib_conversion", label: "IB & Conversion (CRO)", icon: ShieldAlert, desc: "Curriculum & Enquiries" },
+                { key: "ib_conversion", label: "Content & Conversion", icon: ShieldAlert, desc: "Content quality and conversion signals" },
                 { key: "visibility", label: "Search Visibility", icon: TrendingUp, desc: "Indexing & Authority" },
               ].map(({ key, label, icon: Icon, desc }) => {
                 const score = summary.agent_averages[key];
@@ -624,7 +624,7 @@ function BatchReportContent() {
                     <div className="flex items-center gap-3">
                       <div className="font-mono text-xs">
                         <span className={scoreColor(scores["onpage"])}>OP:{scores["onpage"] ? Math.round(scores["onpage"]) : "—"}%</span>{" "}
-                        <span className={scoreColor(scores["ib_conversion"])}>IB:{scores["ib_conversion"] ? Math.round(scores["ib_conversion"]) : "—"}%</span>
+                        <span className={scoreColor(scores["ib_conversion"])}>Content:{scores["ib_conversion"] ? Math.round(scores["ib_conversion"]) : "—"}%</span>
                       </div>
                       <Link
                         href={`/batches/${batch.id}/targets/${item.id}`}
@@ -662,7 +662,7 @@ function BatchReportContent() {
                     <th className="px-4 py-3">URL</th>
                     <th className="px-3 py-3">On-Page</th>
                     <th className="px-3 py-3">Technical</th>
-                    <th className="px-3 py-3">IB & CRO</th>
+                    <th className="px-3 py-3">Content & CRO</th>
                     <th className="px-3 py-3">Parsed Links</th>
                     <th className="px-4 py-3 text-right">Action</th>
                   </tr>
@@ -935,8 +935,8 @@ function BatchReportContent() {
                               : "—"}
                           </span>
                           <span className="text-slate-300">|</span>
-                          <span title="IB Conversion" className={scoreColor(scores["ib_conversion"])}>
-                            IB:
+                          <span title="Content & Conversion" className={scoreColor(scores["ib_conversion"])}>
+                            Content:
                             {scores["ib_conversion"] !== undefined && scores["ib_conversion"] !== null
                               ? `${Math.round(scores["ib_conversion"])}%`
                               : "—"}

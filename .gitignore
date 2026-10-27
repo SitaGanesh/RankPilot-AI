@@ -217,9 +217,45 @@ marimo/_lsp/
 __marimo__/
 
 # Streamlit
-.streamlit/secrets.toml.venv/
+.streamlit/secrets.toml
+
+# Environment & local files
 .env
-__pycache__/
+.env.local
+.env*.local
+celerybeat-schedule*
+*.sqlite3
+*.sqlite3*
+.venv/
 node_modules/
 .next/
-db.sqlite3
+__pycache__/
+*.tsbuildinfo
+*.log
+
+# Editor & OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Internal specification & task briefs
+TaskA.md
+TaskB.md
+TaskC.md
+TaskD.md
+BRIEF.md
+API_EXPLAIN.md
+ARCHITECTURE.md
+AGENTS.md
+COVERAGE_AUDIT.md
+
+# Runtime generated media & local tools
+media/
+.freebuff/
+
+# Ensure frontend source code is never ignored by python packaging rules
+!frontend/lib/
+!frontend/lib/**
+
+.next

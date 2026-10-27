@@ -32,6 +32,7 @@ class AgentStatus(StrEnum):
 class FindingSource(StrEnum):
     DETERMINISTIC = "deterministic"
     LLM = "llm"
+    AGENTIC = "agentic"
 
 
 class Evidence(BaseModel):

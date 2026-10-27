@@ -8,13 +8,25 @@ from urllib.parse import urljoin
 import requests
 
 from core.errors import FetchError, HTTPStatusError, NonHTMLResponseError, SecurityError
+from core.netguard import create_session
 from core.security import MAX_REDIRECTS, validate_url
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
 TIMEOUT = (5, 10)
 USER_AGENT = "SEO-Audit-Bot/1.0 (+https://example.invalid/bot)"
 REDIRECT_CODES = {301, 302, 303, 307, 308}
-ROBOTS_HEADERS = {"content-type", "x-robots-tag", "content-length", "etag", "last-modified"}
+ROBOTS_HEADERS = {
+    "content-type",
+    "x-robots-tag",
+    "content-length",
+    "etag",
+    "last-modified",
+    "server",
+    "strict-transport-security",
+    "cache-control",
+    "content-encoding",
+    "vary",
+}
 
 
 @dataclass(frozen=True)
@@ -55,8 +67,9 @@ def fetch_page(url: str, request_hook: Callable[[], None] | None = None) -> Fetc
     current_url = normalized_url
     redirect_chain: list[str] = []
     started = perf_counter()
-    session = requests.Session()
-    session.cookies.clear()
+    # Pinned DNS session: each connection uses the validated address while the
+    # hostname is retained for Host/SNI/certificate verification.
+    session = create_session()
     try:
         for _ in range(MAX_REDIRECTS + 1):
             if request_hook is not None:

@@ -80,7 +80,7 @@ function formatDate(value: string | null | undefined) {
 const AGENT_LABELS: Record<string, string> = {
   onpage: "On-Page SEO",
   technical: "Technical SEO",
-  ib_conversion: "IB Content & Conversion",
+  ib_conversion: "Content & Conversion",
   visibility: "Organic Visibility & Backlinks",
 };
 
@@ -398,7 +398,7 @@ function TargetReportContent() {
             { id: "onpage", label: "On-Page SEO", icon: FileText },
             { id: "technical", label: "Technical SEO", icon: CheckCircle2 },
             { id: "images", label: `Images (${rawImages.length})`, icon: ImageIcon },
-            { id: "ib_content", label: "IB Curriculum", icon: BookOpen },
+            { id: "ib_content", label: "Content Insights", icon: BookOpen },
             { id: "conversion", label: "Conversion (CRO)", icon: Zap },
             { id: "visibility", label: "Search & Backlinks", icon: TrendingUp },
             { id: "findings", label: `All Findings (${allFindings.length})`, icon: ShieldAlert },
@@ -873,16 +873,16 @@ function TargetReportContent() {
         {/* TAB 6: IB CURRICULUM & CRO */}
         {activeTab === "ib_content" && (
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-bold text-slate-900">IB Curriculum & Authority Alignment</h2>
+            <h2 className="text-base font-bold text-slate-900">Content & Authority Alignment</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              Evaluates relevance to International Baccalaureate programmes, subjects, and local student requirements.
+              Evaluates page content, clarity, authority, and conversion signals recorded by the agents.
             </p>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs">
                 <span className="font-bold text-slate-700">Detected Classification</span>
                 <p className="mt-1 text-sm font-semibold text-slate-900">
-                  {classification?.label ? String(classification.label) : "IB Tutoring Page"}
+                  {classification?.label ? String(classification.label) : "Unclassified page"}
                 </p>
                 <p className="mt-0.5 text-slate-500">
                   Confidence: {classification?.confidence ? `${Math.round(Number(classification.confidence) * 100)}%` : "High"}
@@ -901,7 +901,7 @@ function TargetReportContent() {
             {/* IB Agent Findings */}
             <div className="mt-6">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                IB Curriculum & Content Findings
+                Content and subject-matter findings
               </h3>
               <div className="mt-3 space-y-3">
                 {allFindings
@@ -1042,7 +1042,7 @@ function TargetReportContent() {
                   <option value="all">All Agents</option>
                   <option value="onpage">On-Page SEO</option>
                   <option value="technical">Technical SEO</option>
-                  <option value="ib_conversion">IB Conversion</option>
+                  <option value="ib_conversion">Content & Conversion</option>
                   <option value="visibility">Visibility</option>
                 </select>
                 <select

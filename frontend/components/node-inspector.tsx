@@ -143,10 +143,10 @@ export function NodeInspector({
               <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-bold text-white shadow-xs">
                 <Sparkles size={12} /> Primary Audited Page
               </span>
-              <span className="text-xs font-semibold text-indigo-900">Deep 4-Agent Analysis</span>
+              <span className="text-xs font-semibold text-indigo-900">Deep Multi-Agent Analysis</span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-indigo-950">
-              This is the submitted audit root. Full DOM evidence, headings, content structure, meta tags, and conversion heuristics were deeply analyzed by all 4 specialized agents.
+              This is the audit root. Full DOM evidence, headers, navigation structure, forms, subresources, and SEO/connectivity signals were comprehensively analyzed.
             </p>
           </div>
         ) : (
@@ -156,12 +156,58 @@ export function NodeInspector({
                 Connected Resource
               </span>
               <span className="text-[11px] font-medium text-slate-500">
-                Lightweight Shallow Check
+                {node.deeply_audited ? "Deeply Audited" : "Lightweight Shallow Check"}
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-slate-600">
-              Discovered on the primary audited page. Verified via bounded HTTP check (SSRF validation, status code, redirect chain) without recursive crawling to protect server resources and audit boundaries.
+              {node.deeply_audited
+                ? "This page was deeply crawled and audited with full multi-agent evidence."
+                : "Discovered during crawl. Verified via bounded HTTP checks without recursive crawling to respect rate limits and crawl bounds."}
             </p>
+          </div>
+        )}
+
+        {/* Potential Orphan Alert if applicable */}
+        {node.is_orphan && !isPrimary && isHtmlPage && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                <AlertTriangle size={12} /> Potential Orphan Page
+              </span>
+              <span className="text-xs font-medium text-amber-900">0 Inbound Links in Crawl</span>
+            </div>
+            <p className="mt-2 text-xs text-amber-800 leading-relaxed">
+              No internal links discovered pointing to this page within the configured crawl depth. Note: Orphan status is bounded by crawl depth and limits; verify external discovery channels and sitemaps.
+            </p>
+          </div>
+        )}
+
+        {/* Connectivity & Discovery Metadata */}
+        {(node.in_degree !== undefined || node.out_degree !== undefined || node.discovery_source) && (
+          <div className="space-y-3">
+            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Connectivity & Discovery Architecture
+            </h4>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-lg border border-slate-200 p-2.5 bg-slate-50/50">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Inbound Links</span>
+                <p className="mt-1 text-sm font-bold text-slate-900">
+                  {node.in_degree ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-2.5 bg-slate-50/50">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Outbound Links</span>
+                <p className="mt-1 text-sm font-bold text-slate-900">
+                  {node.out_degree ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-2.5 bg-slate-50/50">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Discovery</span>
+                <p className="mt-1 font-semibold text-slate-800 capitalize truncate" title={node.discovery_source || "crawl"}>
+                  {node.discovery_source || "crawl"}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -188,12 +234,12 @@ export function NodeInspector({
           </div>
 
           {/* If it is a linked HTML page and not the current primary, allow on-demand exploration */}
-          {!isPrimary && isHtmlPage && (
+          {!isPrimary && isHtmlPage && !node.deeply_audited && (
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-slate-900">Deep Audit This Page</p>
                 <p className="text-[11px] text-slate-500">
-                  Launch a full 4-agent single-URL audit with this page as the primary node.
+                  Launch a full multi-agent single-URL audit with this page as the primary node.
                 </p>
               </div>
               <button

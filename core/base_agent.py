@@ -15,6 +15,10 @@ class BaseAgent(ABC):
     scope: str
     checklist: list[Any]
     check_weights: Mapping[str, float] | None = None
+    # Capability declarations used by registry-driven selection. They are
+    # advisory metadata; the deterministic checks remain authoritative.
+    supported_tasks: tuple[str, ...] = ()
+    evidence_requirements: tuple[str, ...] = ()
 
     @abstractmethod
     def run(self, evidence: Any) -> AgentResult:

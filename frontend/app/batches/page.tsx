@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 
 import { createAudit, createBatch, getCrawlURLs, listBatches } from "@/lib/api";
-import { IB_TUTORING_SEED_URLS } from "@/lib/constants";
 import type { AuditBatch } from "@/types/api";
 
 function statusClass(status: string) {
@@ -64,10 +63,6 @@ export default function BatchesIndexPage() {
   useEffect(() => {
     fetchBatches();
   }, []);
-
-  const handleLoadSeeds = () => {
-    setUrlsInput(IB_TUTORING_SEED_URLS.join("\n"));
-  };
 
   const handleClear = () => {
     setUrlsInput("");
@@ -194,8 +189,7 @@ export default function BatchesIndexPage() {
                 <h2 className="text-lg font-bold text-slate-900">Create New Batch Audit</h2>
               </div>
               <p className="mt-1 text-sm text-slate-500">
-                Queue multiple URLs for automated crawling and full 4-agent SEO analysis (On-page, Technical,
-                IB-Content/CRO, Visibility).
+                Queue multiple URLs for the configured SEO agents and review each saved URL report independently.
               </p>
 
               <form onSubmit={handleCreateBatch} className="mt-6 space-y-5">
@@ -213,7 +207,7 @@ export default function BatchesIndexPage() {
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="https://tutors.tychr.com"
+                      placeholder="https://example.com"
                       value={crawlDomainInput}
                       onChange={(e) => setCrawlDomainInput(e.target.value)}
                       disabled={discovering || submitting}
@@ -242,13 +236,6 @@ export default function BatchesIndexPage() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleLoadSeeds}
-                        className="rounded bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
-                      >
-                        ⚡ Load 25 IB Tutoring URLs
-                      </button>
-                      <button
-                        type="button"
                         onClick={handleClear}
                         className="text-xs text-slate-400 hover:text-slate-600"
                       >
@@ -261,7 +248,7 @@ export default function BatchesIndexPage() {
                     rows={8}
                     value={urlsInput}
                     onChange={(e) => setUrlsInput(e.target.value)}
-                    placeholder="https://tutors.tychr.com/ib-tutor/cities/singapore&#10;https://tutors.tychr.com/ib-tutor/cities/toronto&#10;https://tutors.tychr.com/ib-tutor/cities/london"
+                    placeholder="https://example.com/first-page&#10;https://example.com/second-page"
                     disabled={submitting}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:opacity-60"
                   />

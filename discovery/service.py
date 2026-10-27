@@ -203,13 +203,23 @@ class URLDiscoveryService:
                     )
 
     def run(self) -> list[CrawlURL]:
-        with transaction.atomic():
-            root = self._enqueue(self.root_url, 0)
-            if root is None:
-                return []
-            if not self.limits.single_page:
-                self._discover_sitemaps()
-            while True:
+        """Run the bounded crawl without holding a transaction across network I/O.
+
+        Each iteration claims one PENDING row inside a short transaction, then
+        performs the HTTP request with no transaction or row lock held, and
+        finally persists the outcome. This prevents slow remote servers from
+        holding database locks for the duration of a crawl.
+        """
+
+        root = self._enqueue(self.root_url, 0)
+        if root is None:
+            return []
+        if not self.limits.single_page:
+            # Sitemap discovery performs network requests; do it outside any
+            # long-lived database transaction.
+            self._discover_sitemaps()
+        while True:
+            with transaction.atomic():
                 current = (
                     CrawlURL.objects.select_for_update()
                     .filter(audit=self.audit, status=CrawlURL.Status.PENDING)
@@ -222,62 +232,61 @@ class URLDiscoveryService:
                     break
                 current.status = CrawlURL.Status.FETCHING
                 current.save(update_fields=["status", "updated_at"])
-                try:
-                    page = fetch_page(current.url, self._request_hook)
-                    final_url = normalize_url(page.final_url)
-                    if not _same_host(final_url, self.host):
-                        raise SecurityError("Redirect destination is outside the permitted host")
-                    current.final_url = final_url
-                    current.response_status = page.status
-                    if 200 <= page.status < 300:
-                        current.status = CrawlURL.Status.FETCHED
-                    else:
-                        current.status = CrawlURL.Status.FAILED
-                        current.error = f"HTTP response status {page.status}"
-                    current.save(
-                        update_fields=[
-                            "status",
-                            "final_url",
-                            "response_status",
-                            "error",
-                            "updated_at",
-                        ]
-                    )
-                    if current.status == CrawlURL.Status.FETCHED and current.depth < self.limits.max_depth:
-                        self._record_links(current, parse_html(page.body, final_url)["links"])
-                except NonHTMLResponseError as exc:
-                    current.resource_type = CrawlURL.ResourceType.MEDIA
-                    current.status = CrawlURL.Status.SKIPPED
-                    current.final_url = normalize_url(exc.final_url)
-                    current.response_status = exc.status
-                    current.error = f"Non-HTML resource ({exc.content_type or 'unknown content type'})"
-                    current.save(
-                        update_fields=[
-                            "resource_type",
-                            "status",
-                            "final_url",
-                            "response_status",
-                            "error",
-                            "updated_at",
-                        ]
-                    )
-                except RequestBudgetExceeded as exc:
-                    current.status = CrawlURL.Status.SKIPPED
-                    current.error = str(exc)
-                    current.save(update_fields=["status", "error", "updated_at"])
-                except HTTPStatusError as exc:
+            try:
+                page = fetch_page(current.url, self._request_hook)
+                final_url = normalize_url(page.final_url)
+                if not _same_host(final_url, self.host):
+                    raise SecurityError("Redirect destination is outside the permitted host")
+                current.final_url = final_url
+                current.response_status = page.status
+                if 200 <= page.status < 300:
+                    current.status = CrawlURL.Status.FETCHED
+                else:
                     current.status = CrawlURL.Status.FAILED
-                    current.response_status = exc.status
-                    current.error = str(exc)
-                    current.save(
-                        update_fields=["status", "response_status", "error", "updated_at"]
-                    )
-                except (SecurityError, FetchError, ValueError) as exc:
-                    current.status = CrawlURL.Status.FAILED
-                    current.error = str(exc)
-                    current.save(update_fields=["status", "error", "updated_at"])
-            if self.audit.crawl_urls.filter(status=CrawlURL.Status.PENDING).exists():
-                self.audit.crawl_urls.filter(status=CrawlURL.Status.PENDING).update(
-                    status=CrawlURL.Status.SKIPPED
+                    current.error = f"HTTP response status {page.status}"
+                current.save(
+                    update_fields=[
+                        "status",
+                        "final_url",
+                        "response_status",
+                        "error",
+                        "updated_at",
+                    ]
                 )
+                if current.status == CrawlURL.Status.FETCHED and current.depth < self.limits.max_depth:
+                    self._record_links(current, parse_html(page.body, final_url)["links"])
+            except NonHTMLResponseError as exc:
+                current.resource_type = CrawlURL.ResourceType.MEDIA
+                current.status = CrawlURL.Status.SKIPPED
+                current.final_url = normalize_url(exc.final_url)
+                current.response_status = exc.status
+                current.error = f"Non-HTML resource ({exc.content_type or 'unknown content type'})"
+                current.save(
+                    update_fields=[
+                        "resource_type",
+                        "status",
+                        "final_url",
+                        "response_status",
+                        "error",
+                        "updated_at",
+                    ]
+                )
+            except RequestBudgetExceeded as exc:
+                current.status = CrawlURL.Status.SKIPPED
+                current.error = str(exc)
+                current.save(update_fields=["status", "error", "updated_at"])
+            except HTTPStatusError as exc:
+                current.status = CrawlURL.Status.FAILED
+                current.response_status = exc.status
+                current.error = str(exc)
+                current.save(
+                    update_fields=["status", "response_status", "error", "updated_at"]
+                )
+            except (SecurityError, FetchError, ValueError) as exc:
+                current.status = CrawlURL.Status.FAILED
+                current.error = str(exc)
+                current.save(update_fields=["status", "error", "updated_at"])
+        self.audit.crawl_urls.filter(status=CrawlURL.Status.PENDING).update(
+            status=CrawlURL.Status.SKIPPED
+        )
         return list(self.audit.crawl_urls.order_by("depth", "created_at", "id"))

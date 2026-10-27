@@ -1,19 +1,33 @@
 export type AuditStatus =
   | "pending"
+  | "queued"
   | "collecting"
   | "collected"
   | "running"
+  | "waiting_for_access"
+  | "waiting_for_approval"
   | "completed"
-  | "failed";
+  | "completed_with_limitations"
+  | "failed"
+  | "cancelled";
 
-export type CrawlStatus = "pending" | "fetching" | "fetched" | "failed" | "skipped";
+export type CrawlStatus =
+  | "pending"
+  | "queued"
+  | "fetching"
+  | "fetched"
+  | "processing"
+  | "completed"
+  | "discovered"
+  | "failed"
+  | "skipped";
 export type CrawlResourceType = "page" | "media";
 
 export type DiscoverySource = "submitted" | "internal_link" | "sitemap";
 export type BatchStatus = "pending" | "running" | "completed" | "partial" | "failed" | "cancelled";
 export type BatchTargetStatus = "pending" | "running" | "retryable" | "completed" | "failed" | "skipped";
 export type AnalysisStatus = "pending" | "running" | "completed" | "partial" | "failed";
-export type AgentId = "onpage" | "technical" | "visibility" | "ib_conversion";
+export type AgentId = "onpage" | "technical" | "functionality" | "connectivity" | "visibility" | string;
 
 export interface AuditCreated {
   id: string;
@@ -124,10 +138,20 @@ export interface AuditStatusResponse {
   id: string;
   url: string;
   status: AuditStatus;
+  mode?: "standard" | "agentic" | string;
+  audit_type?: "page" | "website" | string;
+  max_crawl_pages?: number;
+  max_crawl_depth?: number;
+  pages_crawled_count?: number;
+  objective?: string;
   current_stage: string;
+  execution_backend?: string;
+  stop_reason?: string;
   created_at: string;
   stage_events: StageEvent[];
   metrics?: ResourceGraphMetrics;
+  crawl_coverage?: CrawlCoverage | null;
+  investigation?: InvestigationSummary | null;
 }
 
 export interface CrawlURL {
@@ -141,6 +165,11 @@ export interface CrawlURL {
   discovery_source_url: string;
   discovered_from: number | null;
   final_url: string;
+  deeply_audited?: boolean;
+  page_title?: string;
+  timing_ms?: number;
+  content_type?: string;
+  browser_data?: Record<string, any>;
   error: string;
   created_at: string;
   updated_at: string;
@@ -400,6 +429,11 @@ export interface ResourceGraphNode {
   content_type: string;
   is_internal: boolean;
   deeply_audited: boolean;
+  in_degree?: number;
+  out_degree?: number;
+  is_orphan?: boolean;
+  discovery_source?: string;
+  score_percent?: number | null;
   details: ResourceNodeDetails;
   issues: ResourceGraphIssue[];
   recommendations: string[];
@@ -436,6 +470,8 @@ export interface ResourceGraphMetrics {
   successfully_checked_resources: number;
   failed_resources_count: number;
   redirect_count: number;
+  orphan_pages_count?: number;
+  crawl_coverage_limited?: boolean;
 }
 
 export interface ResourceGraph {
@@ -445,3 +481,692 @@ export interface ResourceGraph {
   metrics: ResourceGraphMetrics;
 }
 
+/* ------------------------------------------------------------------ */
+/* Agentic investigation                                              */
+/* ------------------------------------------------------------------ */
+
+export type InvestigationStatus =
+  | "queued"
+  | "running"
+  | "waiting_for_access"
+  | "waiting_for_approval"
+  | "interrupted"
+  | "completed"
+  | "completed_with_limitations"
+  | "failed"
+  | "cancelled";
+
+export interface InvestigationAction {
+  sequence: number;
+  decision_type: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  rationale: string;
+  status: "running" | "succeeded" | "failed" | "rejected";
+  result_json: Record<string, unknown> | null;
+  observation: string;
+  error: string;
+  evidence_ref: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+}
+
+export interface InvestigationFinding {
+  id: number;
+  finding_ref: string;
+  check_id: string;
+  title: string;
+  status: string;
+  severity: string;
+  confidence: number;
+  affected_urls: string[];
+  observed: string;
+  expected: string;
+  root_cause: string;
+  recommendation: string;
+  evidence_refs: string[];
+  source_tool: string;
+  verification_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvestigationHypothesis {
+  id: number;
+  statement: string;
+  status: string;
+  confidence: number;
+  supporting_evidence: string[];
+  contradicting_evidence: string[];
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RemediationProposal {
+  id: number;
+  finding_ref: string;
+  status: string;
+  change: string;
+  scope: string[];
+  expected_outcome: string;
+  risk: string;
+  verification_method: string;
+  rollback: string;
+  baseline: Record<string, unknown>;
+  evidence_refs: string[];
+  approval_note: string;
+  approved_at: string | null;
+  execution_status: string;
+  execution_result: Record<string, unknown>;
+  verification: Record<string, unknown>;
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvestigationProgress {
+  actions_completed: number;
+  actions_rejected: number;
+  iterations_used: number;
+  iterations_max: number;
+  tool_calls_used: number;
+  tool_calls_max: number;
+  requests_used: number;
+  request_budget: number;
+}
+
+export interface InvestigationCurrentAction {
+  sequence: number;
+  decision_type: string;
+  tool_name: string;
+  status: string;
+  observation: string;
+}
+
+export interface InvestigationSummary {
+  id: string;
+  objective: string;
+  status: InvestigationStatus;
+  stop_reason: string;
+  iteration_count: number;
+  max_iterations: number;
+  tool_call_count: number;
+  max_tool_calls: number;
+  model_call_count: number;
+  max_model_calls: number;
+  requests_used: number;
+  request_budget: number;
+  current_action: InvestigationCurrentAction | null;
+  progress: InvestigationProgress;
+  started_at: string | null;
+  finished_at: string | null;
+  last_checkpoint_at: string | null;
+}
+
+export interface InvestigationDetail extends InvestigationSummary {
+  audit_id: string;
+  plan: Record<string, unknown>;
+  next_action: Record<string, unknown>;
+  time_budget_seconds: number;
+  limitations: string[];
+  actions: InvestigationAction[];
+  findings: InvestigationFinding[];
+  hypotheses: InvestigationHypothesis[];
+  proposals: RemediationProposal[];
+  coverage: Record<string, unknown>;
+}
+
+export interface InvestigationResponse {
+  audit_id: string;
+  mode: "standard" | "agentic" | string;
+  objective: string;
+  execution_backend: string;
+  stop_reason: string;
+  investigation: InvestigationDetail | null;
+  report_available: boolean;
+}
+
+export interface InvestigationStarted {
+  audit_id: string;
+  investigation_id: string;
+  status: string;
+  execution_backend: string;
+}
+
+export interface AuditLiveEvent {
+  id: number;
+  audit_id: string;
+  url: string;
+  event_type: string;
+  data: Record<string, any>;
+  created_at: string;
+}
+
+export interface LiveEventsPollResponse {
+  audit_id: string;
+  status: AuditStatus;
+  current_stage: string;
+  pages_crawled_count: number;
+  last_event_id: number;
+  completed: boolean;
+  events: AuditLiveEvent[];
+}
+
+export interface BrowserObservationData {
+  url?: string;
+  final_url?: string;
+  status_code?: number;
+  redirect_chain?: string[];
+  headers?: Record<string, string>;
+  timing_ms?: number;
+  browser_engine?: string;
+  raw_title?: string;
+  rendered_title?: string;
+  page_title?: string;
+  title_changed?: boolean;
+  raw_canonical?: string;
+  rendered_canonical?: string;
+  canonical?: string;
+  canonical_changed?: boolean;
+  raw_word_count?: number;
+  rendered_word_count?: number;
+  empty_html_shell?: boolean;
+  rendered_dom_available?: boolean;
+  console_errors?: Array<{
+    kind?: string;
+    type?: string;
+    severity?: string;
+    text?: string;
+    message?: string;
+    location?: Record<string, any>;
+    page_url?: string;
+    source_url?: string;
+    stack?: string;
+    timestamp?: string;
+    occurrences?: number;
+  }>;
+  console_events?: Array<Record<string, unknown>>;
+  network_requests?: Array<{
+    url?: string;
+    method?: string;
+    resource_type?: string;
+    status?: number;
+    status_text?: string;
+    content_type?: string;
+    duration_ms?: number | null;
+    redirected_from?: string;
+    page_url?: string;
+  }>;
+  resource_checks?: Array<Record<string, unknown>>;
+  failed_requests?: Array<{
+    kind?: string;
+    url?: string;
+    method?: string;
+    resource_type?: string;
+    status?: number;
+    status_text?: string;
+    failure?: string;
+    error?: string;
+    content_type?: string;
+    page_url?: string;
+    timestamp?: string;
+    occurrences?: number;
+  }>;
+  resource_summary?: {
+    images_count?: number;
+    scripts_count?: number;
+    stylesheets_count?: number;
+    checked_assets_count?: number;
+    failed_assets_count?: number;
+  };
+  accessibility_summary?: {
+    h1_count?: number;
+    total_headings?: number;
+    images_count?: number;
+    missing_alt_count?: number;
+    has_lang?: boolean;
+    has_viewport?: boolean;
+  };
+  raw_internal_links?: Array<Record<string, any>>;
+  internal_links?: Array<Record<string, any>>;
+  external_links?: string[];
+  screenshot_id?: string;
+  screenshot_data?: string;
+  screenshot_metadata?: {
+    screenshot_id?: string;
+    screenshot_path?: string;
+    width?: number;
+    height?: number;
+    bytes?: number;
+    captured_at?: string;
+    viewport?: string;
+  };
+  performance_metrics?: Record<string, any>;
+  navigation_summary?: {
+    nav_elements_count?: number;
+    menu_links_count?: number;
+    empty_hrefs_count?: number;
+    mobile_toggles_count?: number;
+    sample_nav_labels?: string[];
+  };
+  forms_summary?: {
+    total_forms?: number;
+    visible_forms?: number;
+    inputs_count?: number;
+    required_inputs_count?: number;
+    labeled_inputs_count?: number;
+    submit_buttons_count?: number;
+    forms_with_validation?: number;
+    safe_status?: string;
+    forms_detail?: Array<Record<string, any>>;
+  };
+  interactive_controls_summary?: {
+    buttons_count?: number;
+    buttons_without_accessible_name?: number;
+    disabled_buttons_count?: number;
+    sample_buttons?: Array<Record<string, any>>;
+  };
+  layout_summary?: {
+    has_viewport_meta?: boolean;
+    landmarks?: Record<string, any>;
+    has_horizontal_scroll_overflow?: boolean;
+  };
+  error?: string;
+}
+
+export interface PageAuditFinding {
+  id: string;
+  check_id: string;
+  title: string;
+  status: "pass" | "warn" | "fail" | "skipped" | "unavailable" | "inconclusive" | string;
+  severity: "critical" | "high" | "medium" | "low" | "info" | string;
+  weight?: number;
+  points_earned?: number;
+  evidence?: {
+    observed?: string;
+    expected?: string;
+    selector?: string;
+  };
+  observed?: string;
+  expected?: string;
+  observed_evidence?: string;
+  actionable_recommendations?: string[] | string;
+  section_or_element?: string;
+  intended_audience_context?: string;
+  suggested_verification?: string;
+  why_it_matters?: string;
+  recommendation?: string;
+  verification_guidance?: string;
+  confidence?: number;
+  source?: string;
+  category?: string;
+  agent_id?: string;
+  perspective?: string;
+  affected_urls?: string[];
+  priority?: string;
+  priority_rationale?: string;
+  specific_claim_or_passage?: string;
+  assessment?: "supported" | "potentially_inaccurate" | "outdated" | "incomplete" | "ambiguous" | "unverifiable" | string;
+  authoritative_source?: string;
+  educational_implications?: string;
+  verification_limitations?: string;
+  page_url?: string;
+  page_title?: string;
+}
+
+export interface PageAuditReport {
+  id: number;
+  audit_id: string;
+  crawl_url_id: number | null;
+  url: string;
+  normalized_url: string;
+  title: string;
+  status_code: number | null;
+  score_percent: number | null;
+  report_json: {
+    findings?: PageAuditFinding[];
+    summary?: Record<string, any>;
+    agent_results?: Record<string, any>;
+    agents?: Record<string, any>;
+    status?: string;
+    error_reason?: string | null;
+    url?: string;
+    executive_summary?: string;
+    score?: { percent: number; band?: string };
+    diagnostics?: Record<string, any>;
+    links?: Array<Record<string, unknown>>;
+    resources?: Array<Record<string, unknown>>;
+    console_events?: Array<Record<string, unknown>>;
+    network_requests?: Array<Record<string, unknown>>;
+    observation_sources?: Record<string, string>;
+    browser_observation?: Record<string, any>;
+    landing_page_analysis?: LandingPageReport;
+    [key: string]: unknown;
+  };
+  browser_data: BrowserObservationData;
+  created_at: string;
+  updated_at: string;
+}
+
+
+export interface WebsiteDimensionSummary {
+  name: string;
+  score: number | null;
+  score_methodology?: string;
+  total_findings: number;
+  issues_count: number;
+  summary: string;
+  top_issues: PageAuditFinding[];
+  strengths?: string[];
+  telemetry?: Record<string, unknown>;
+}
+
+export interface CrossPageIssueItem {
+  issue_id: string;
+  title: string;
+  perspective: string;
+  affected_pages_count: number;
+  affected_urls: string[];
+  root_cause_diagnosis: string;
+  impact_level: "critical" | "high" | "medium" | "low" | string;
+  actionable_fix: string;
+  verification_method: string;
+}
+
+export interface PrioritizedActionPlanItem {
+  rank: number;
+  perspective: string;
+  title: string;
+  action: string;
+  rationale: string;
+  affected_urls: string[];
+  priority: "critical" | "high" | "medium" | "low" | string;
+  effort_estimate: "quick_win" | "moderate" | "substantial" | string;
+  verification_step: string;
+}
+
+export interface CrawlCoverage {
+  discovered_unique_urls: number;
+  queued_urls: number;
+  attempted_fetches: number;
+  fetched_html_pages: number;
+  deeply_analyzed_pages: number;
+  failed_pages: number;
+  skipped_urls: number;
+  shallowly_checked_links: number;
+  unique_resources: number;
+  links_recorded: number;
+  page_reports: number;
+  status_breakdown?: Record<string, number>;
+}
+
+export interface ConsolidatedWebsiteReport {
+  audit_id: string;
+  target_url: string;
+  normalized_url: string;
+  audit_type: string;
+  generated_at: string;
+  pages_crawled_count: number;
+  crawl_coverage?: CrawlCoverage;
+  score: {
+    percent: number | null;
+    band: "excellent" | "good" | "needs_improvement" | "poor" | "not_scored" | string;
+    methodology?: string;
+  };
+  executive_summary?: string;
+  top_strengths?: string[];
+  critical_blockers?: string[];
+  perspectives?: {
+    seo?: Record<string, unknown>;
+    marketing?: Record<string, unknown>;
+    sales?: Record<string, unknown>;
+    subject_matter?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  cross_page_issues?: CrossPageIssueItem[];
+  prioritized_actions?: PrioritizedActionPlanItem[];
+  conflicting_recommendations_resolved?: string[];
+  limitations?: string[];
+  dimensions: {
+    technical_seo_ai?: WebsiteDimensionSummary;
+    content_quality?: WebsiteDimensionSummary;
+    marketing_conversion?: WebsiteDimensionSummary;
+    website_functionality?: WebsiteDimensionSummary;
+    overall_connectivity?: WebsiteDimensionSummary;
+    seo?: WebsiteDimensionSummary;
+    marketing?: WebsiteDimensionSummary;
+    sales?: WebsiteDimensionSummary;
+    subject_matter?: WebsiteDimensionSummary;
+    [key: string]: WebsiteDimensionSummary | undefined;
+  };
+  all_pages: Array<{
+    id: number;
+    url: string;
+    title: string;
+    status_code: number | null;
+    score_percent: number | null;
+    findings_count: number;
+  }>;
+  browser_session_summary: {
+    pages_inspected: number;
+    console_error_events?: number;
+    javascript_errors_detected?: number;
+    failed_network_requests: number;
+    unique_resources_checked?: number;
+    rendered_dom_utilized: boolean;
+    average_page_timing_ms?: number;
+  };
+}
+
+export interface LandingPerspectiveData {
+  perspective: "marketing" | "sales" | "subject_matter" | "seo_functionality" | string;
+  title: string;
+  health_score?: number | null;
+  score_band?: "excellent" | "good" | "needs_improvement" | "poor" | string | null;
+  summary: string;
+  strengths: string[];
+  key_weaknesses: string[];
+  findings: PageAuditFinding[];
+}
+
+export interface LandingGapAnalysisData {
+  missing_information: string[];
+  unanswered_objections: string[];
+  trust_gaps: string[];
+  messaging_problems: string[];
+  conversion_opportunities: string[];
+}
+
+export interface LandingPrioritizedRecommendation {
+  rank: number;
+  perspective: string;
+  title: string;
+  expected_benefit: string;
+  implementation_direction: string;
+  priority: "critical" | "high" | "medium" | "low" | string;
+  effort: "quick_win" | "moderate" | "substantial" | string;
+  verification_step: string;
+}
+
+export interface LandingPageReport {
+  page_url: string;
+  page_title: string;
+  landing_page_purpose: string;
+  intended_audience: {
+    target_profiles?: string[];
+    primary_needs?: string[];
+    search_intent?: string;
+    journey_stage?: string;
+  };
+  commercial_offer: {
+    offer_summary?: string;
+    value_proposition?: string;
+    positioning?: string;
+    pricing_clarity?: string;
+  };
+  executive_summary: string;
+  overall_score: number;
+  score_band: "excellent" | "good" | "needs_improvement" | "poor" | string;
+  top_strengths: string[];
+  critical_blockers: string[];
+  key_observations: string[];
+  perspectives: {
+    marketing?: LandingPerspectiveData;
+    sales?: LandingPerspectiveData;
+    subject_matter?: LandingPerspectiveData;
+    seo_functionality?: LandingPerspectiveData;
+    [key: string]: LandingPerspectiveData | undefined;
+  };
+  gap_analysis: LandingGapAnalysisData;
+  prioritized_recommendations: LandingPrioritizedRecommendation[];
+  all_findings?: PageAuditFinding[];
+  coverage_indicators?: {
+    rendered_dom_utilized: boolean;
+    browser_telemetry_included: boolean;
+    console_errors_count: number;
+    failed_network_requests: number;
+    load_time_ms: number;
+    word_count: number;
+  };
+  unavailable_data_indicators?: string[];
+  uncertainties?: string[];
+  ib_context?: {
+    is_ib_page: boolean;
+    curriculum_detected: string[];
+    official_references: string[];
+    subject_matter_notes: string;
+  } | null;
+}
+
+/* ================================================================== */
+/* Marketing Intelligence Agent                                        */
+/* ================================================================== */
+
+export type MarketingCriterion =
+  | "audience_intent"
+  | "value_proposition"
+  | "content_quality"
+  | "visitor_journey"
+  | "brand_positioning";
+
+export type MarketingPriority = "Critical" | "High" | "Medium" | "Low";
+export type MarketingLevel = "Low" | "Medium" | "High";
+
+export type MarketingMetric =
+  | "organic_traffic"
+  | "engagement"
+  | "conversion"
+  | "bounce_rate"
+  | "trust_credibility"
+  | "lead_quality"
+  | "brand_clarity";
+
+export interface MarketingImpactEffect {
+  metric: MarketingMetric;
+  direction: "increase" | "decrease" | "neutral";
+  magnitude: MarketingLevel;
+  good_for_business: boolean;
+  explanation: string;
+}
+
+export interface MarketingActionItem {
+  title: string;
+  criterion: MarketingCriterion;
+  priority: MarketingPriority;
+  complexity: MarketingLevel;
+  current_situation: string;
+  recommended_change: string;
+  reason: string;
+  expected_outcome: string;
+  why_better: string;
+  impact_level: MarketingLevel;
+  nature_of_impact: MarketingImpactEffect[];
+  evidence: string[];
+  success_metric: string;
+  confidence: MarketingLevel;
+  // enriched by agent
+  rank?: number;
+  page_url?: string;
+  page_type?: string;
+}
+
+export interface MarketingCriterionAssessment {
+  criterion: MarketingCriterion;
+  score: number; // 1–10
+  current_situation: string;
+  strengths: string[];
+  gaps: string[];
+}
+
+export interface MarketingAudienceFit {
+  identified_audiences: string[];
+  likely_visitor_intent: string;
+  intent_match: MarketingLevel;
+  audience_too_broad_or_unclear: boolean;
+  assessment: string;
+}
+
+export interface MarketingPageReport {
+  url: string;
+  page_type: string;
+  summary: string;
+  audience_fit: MarketingAudienceFit;
+  criteria: MarketingCriterionAssessment[];
+  positioning_gaps: string[];
+  messaging_weaknesses: string[];
+  content_improvements: string[];
+  missing_information: string[];
+  unsupported_or_vague_claims: string[];
+  action_items: MarketingActionItem[];
+  html_signals?: {
+    title?: string;
+    meta_description?: string;
+    headings?: Array<{ tag: string; text: string }>;
+    calls_to_action?: Array<{ text: string; href?: string }>;
+    word_count?: number;
+    images_total?: number;
+    images_missing_alt?: number;
+    has_structured_data?: boolean;
+    forms_count?: number;
+    internal_link_count?: number;
+  };
+}
+
+export interface MarketingResearchBrief {
+  business_summary: string;
+  likely_audiences: string[];
+  competitors: string[];
+  external_reputation_notes: string;
+  priority_pages: string[];
+  brand_document_notes: string;
+}
+
+export interface MarketingSiteSynthesis {
+  executive_summary: string;
+  overall_marketing_score: number; // 1–10
+  audience_fit_summary: string;
+  cross_page_inconsistencies: string[];
+  strategic_positioning_gaps: string[];
+  sequencing_rationale: string;
+}
+
+export interface MarketingRunResult {
+  site: MarketingSiteSynthesis;
+  pages: MarketingPageReport[];
+  roadmap: MarketingActionItem[];
+  failed_pages: Array<{ url: string; error: string }>;
+}
+
+export interface MarketingRun {
+  id: number;
+  audit_id: string;
+  url: string;
+  status: "queued" | "running" | "done" | "failed";
+  research_brief: MarketingResearchBrief | null;
+  result: MarketingRunResult | null;
+  error: string;
+  created_at: string;
+  updated_at: string;
+}
